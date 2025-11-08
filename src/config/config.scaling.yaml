@@ -1,0 +1,6 @@
+# Scaling configuration to stress generation
+seed: 101
+number_of_companies: 1000
+drivers_per_company: 25
+event_rate_per_driver: 4.2
+company_onboarding_interval: PT30M  # More frequent onboarding

@@ -1,0 +1,88 @@
+name: spark-experiments
+
+services:
+  spark-driver:
+    image: apache/spark:3.5.0
+    container_name: spark-driver
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    ports:
+      - "17080:8080"
+      - "17077:7077"
+      - "14040:4040"
+    volumes:
+      - ../data:/data
+      - ../src:/app/src
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    networks:
+      - spark-network
+
+  spark-executor:
+    image: apache/spark:3.5.0
+    container_name: spark-executor
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-driver:7077
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=1
+    volumes:
+      - ../data:/data
+      - ../src:/app/src
+    depends_on:
+      - spark-driver
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    networks:
+      - spark-network
+
+  generator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.generator
+    container_name: generator
+    ports:
+      - "18000:8000"
+    volumes:
+      - ../data:/data
+      - ../data:/app/data
+      - ../src:/app/src
+    working_dir: /app
+    environment:
+      - PYTHONPATH=/app
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - spark-network
+    stdin_open: true
+    tty: true
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: http://localhost:18000
+    container_name: generator-frontend
+    environment:
+      - VITE_API_BASE=http://generator:8000
+    ports:
+      - "19000:80"
+    depends_on:
+      - generator
+    networks:
+      - spark-network
+
+networks:
+  spark-network:
+    driver: bridge
