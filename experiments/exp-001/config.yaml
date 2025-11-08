@@ -1,0 +1,7 @@
+# Base configuration for driving batch generators (initial iteration)
+seed: 42
+number_of_companies: 10
+drivers_per_company: 5
+event_rate_per_driver: 3.5  # average events per 15-minute interval
+company_onboarding_interval: PT1H  # ISO8601 duration (1 hour)
+# Notes: geography fixed to US; no deactivation.
