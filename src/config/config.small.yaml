@@ -1,0 +1,6 @@
+# Small configuration for fast local test runs
+seed: 7
+number_of_companies: 5
+drivers_per_company: 3
+event_rate_per_driver: 2.0
+company_onboarding_interval: PT2H

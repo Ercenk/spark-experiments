@@ -1,14 +1,15 @@
 <!--
 Sync Impact Report
-Version: UNSET -> 0.1.0
-Modified Principles: (initial creation)
-Added Sections: Core Principles; Environment & Data Constraints; Development Workflow & Review Gates; Governance
+Version: 0.1.0 -> 0.2.0 (MINOR: new principle added)
+Modified Principles: (none)
+Added Sections: Principle VI - Strict Python Type Safety
 Removed Sections: (none)
 Templates Alignment:
-	.specify/templates/plan-template.md ✅ (Constitution Check will reference principles below)
+	.specify/templates/plan-template.md ✅ (Constitution Check will reference type safety principle)
 	.specify/templates/spec-template.md ✅ (Independent user stories unaffected)
 	.specify/templates/tasks-template.md ✅ (Task grouping by story unchanged)
-Deferred TODOs: None (all placeholders resolved)
+Deferred TODOs: None
+Rationale: Adding strict type checking enforcement for Python code quality, maintainability, and early error detection.
 -->
 
 # Spark Transportation Ingestion Sandbox Constitution
@@ -62,10 +63,24 @@ datasets MUST be removed after experiments. Code MUST favor clarity over
 micro-optimizations. Justifications for retained complexity go into
 `complexity.md` at repo root if recurring.
 
+### VI. Strict Python Type Safety
+All Python source files MUST use comprehensive type annotations for function
+signatures (parameters and return types), class attributes, and module-level
+variables. Type hints MUST follow PEP 484 conventions using standard library
+`typing` module constructs (e.g., `List[str]`, `Optional[int]`, `Dict[str, Any]`).
+Generic types MUST be fully parameterized (no bare `list`, `dict`). Type checking
+MUST be enforced via `mypy` in strict mode (`--strict` flag) with zero errors
+tolerated in CI/CD pipeline or pre-commit hooks. New code without type annotations
+is BLOCKED from merge. Existing untyped code MUST be annotated incrementally;
+exemptions require explicit `# type: ignore[error-code]` comments with
+justification. Rationale: Type safety prevents entire classes of runtime errors,
+improves IDE support, enables confident refactoring, and serves as executable
+documentation for data generator schemas and Spark transformation pipelines.
+
 ## Environment & Data Constraints
 
 Docker Compose is the canonical orchestration. Spark image MUST pin exact
-version (e.g., `spark:3.5.0`); upgrading versions triggers a new experiment to
+version (e.g., `apache/spark:3.5.0`); upgrading versions triggers a new experiment to
 compare performance deltas. Resource allocation (driver/executor memory/cores)
 MUST be explicitly declared; implicit defaults prohibited. Local filesystem
 storage under `/data` MUST separate raw, staged, and processed zones.
@@ -83,7 +98,7 @@ original unmodified copy. All schemas MUST be versioned (`schema-vX.Y.json`).
 
 Pull requests MUST include: experiment id, hypothesis file path, dataset
 manifest reference, expected vs actual metrics table. Reviewers MUST deny if
-any principle violation is unaddressed.
+**Version**: 0.2.0 | **Ratified**: 2025-11-08 | **Last Amended**: 2025-11-08
 
 ## Governance
 

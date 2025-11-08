@@ -1,0 +1,163 @@
+openapi: 3.1.0
+info:
+  title: Generator Control API
+  version: 0.1.0
+  description: Control and observability endpoints consumed by Generator Control SPA
+servers:
+  - url: http://localhost:18000
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Get aggregated health snapshot
+      responses:
+        '200':
+          description: Health snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthSnapshot'
+  /status:
+    get:
+      operationId: getStatus
+      summary: Get lifecycle status
+      responses:
+        '200':
+          description: Lifecycle status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleStatus'
+  /pause:
+    post:
+      operationId: pauseGenerators
+      summary: Pause all generators
+      responses:
+        '200':
+          description: Pause result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlResult'
+  /resume:
+    post:
+      operationId: resumeGenerators
+      summary: Resume all generators
+      responses:
+        '200':
+          description: Resume result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlResult'
+  /clean:
+    post:
+      operationId: resetData
+      summary: Reset generated data (requires paused state)
+      responses:
+        '200':
+          description: Reset result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResetResult'
+        '409':
+          description: Conflict – generators not paused
+  /logs:
+    get:
+      operationId: getLogs
+      summary: Fetch recent log entries
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 200
+        - in: query
+          name: since
+          schema:
+            type: string
+            format: date-time
+          required: false
+        - in: query
+          name: level
+          schema:
+            type: string
+            enum: [info, warning, error]
+          required: false
+      responses:
+        '200':
+          description: Log entries response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogsResponse'
+components:
+  schemas:
+    Generator:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [running, paused, degraded] }
+        uptimeSeconds: { type: integer, minimum: 0 }
+        lastActivityTs: { type: string, format: date-time }
+        totalBatches: { type: integer, minimum: 0 }
+        batchesPerMinute: { type: number, minimum: 0 }
+        pausedAtTs: { type: string, format: date-time, nullable: true }
+      required: [id, status, uptimeSeconds, lastActivityTs, totalBatches]
+    HealthSnapshot:
+      type: object
+      properties:
+        capturedTs: { type: string, format: date-time }
+        overallStatus: { type: string, enum: [running, paused, degraded] }
+        generators:
+          type: array
+          items: { $ref: '#/components/schemas/Generator' }
+        totalBatches: { type: integer }
+        generationRatePerMin: { type: number }
+      required: [capturedTs, overallStatus, generators]
+    LifecycleStatus:
+      type: object
+      properties:
+        status: { type: string, enum: [running, paused] }
+        paused: { type: boolean }
+        lastStateChangeTs: { type: string, format: date-time }
+      required: [status, paused, lastStateChangeTs]
+    ControlResult:
+      type: object
+      properties:
+        success: { type: boolean }
+        action: { type: string, enum: [pause, resume, reset] }
+        status: { type: string, enum: [running, paused] }
+        timestamp: { type: string, format: date-time }
+        message: { type: string, nullable: true }
+        error: { type: string, nullable: true }
+      required: [success, action, status, timestamp]
+    ResetResult:
+      allOf:
+        - $ref: '#/components/schemas/ControlResult'
+        - type: object
+          properties:
+            filesRemoved: { type: integer, minimum: 0 }
+            durationMs: { type: integer, minimum: 0 }
+          required: [filesRemoved, durationMs]
+    LogEntry:
+      type: object
+      properties:
+        ts: { type: string, format: date-time }
+        level: { type: string, enum: [info, warning, error] }
+        message: { type: string }
+        source: { type: string }
+        context: { type: object, nullable: true }
+      required: [ts, level, message]
+    LogsResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items: { $ref: '#/components/schemas/LogEntry' }
+        nextSince: { type: string, format: date-time, nullable: true }
+        totalReturned: { type: integer }
+      required: [entries]

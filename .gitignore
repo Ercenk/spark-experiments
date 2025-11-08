@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite-cache/
+*.tsbuildinfo
+*.eslintcache
+
+# Frontend environment
+frontend/.env
+frontend/.env.*
+
+# Data (local volumes, not tracked)
+data/*
+!data/.gitkeep
+!data/manifests/.gitkeep
+
+# Experiment outputs (tracked selectively)
+experiments/*/metrics.jsonl
+experiments/*/output/
+
+# Temporary
+*.tmp
+*.bak

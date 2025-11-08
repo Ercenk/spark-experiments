@@ -1,0 +1,48 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Specify framework
+.specify/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+
+# Data volumes (mounted separately)
+data/
+
+# Logs
+*.log
+logs/
+
+# Experiments
+experiments/
+
+# Tests (not needed in runtime image)
+tests/
+
+# CI/CD
+.github/
