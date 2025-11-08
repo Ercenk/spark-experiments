@@ -214,6 +214,92 @@ def run_driver_generator_continuous(
     interval_minutes = 15
     batch_counter = 0
     
+    # Check if this is initial startup (no batches exist)
+    output_path = Path(output_dir)
+    has_existing_batches = output_path.exists() and any(output_path.iterdir())
+    
+    if not has_existing_batches:
+        if logger:
+            logger.info(
+                "Initial startup detected - generating first driver event batch immediately",
+                metadata={"output_dir": output_dir}
+            )
+        # Generate batch for current/most recent interval immediately
+        # For initial startup, use current time as cutoff so newly created companies are included
+        now = datetime.now(timezone.utc)
+        interval_start, interval_end = generator.compute_interval_bounds(now, interval_minutes)
+        
+        batch_seed = seed + batch_counter
+        batch_start_time = datetime.now(timezone.utc)
+        
+        # Get eligible companies (use 'now' instead of interval_start for initial batch)
+        from src.generators.coordination import get_onboarded_companies_before as coord_get_companies
+        eligible_companies = coord_get_companies(now, companies_file)
+        
+        if logger:
+            logger.info(
+                "Generating batch for interval with initial startup eligible companies",
+                metadata={
+                    "interval_start": interval_start.isoformat(),
+                    "interval_end": interval_end.isoformat(),
+                    "eligible_companies": len(eligible_companies),
+                    "seed": batch_seed
+                }
+            )
+        
+        # Generate events using the eligible companies
+        events = generator.generate_driver_events(
+            eligible_companies,
+            config,
+            interval_start,
+            interval_end,
+            batch_seed
+        )
+        
+        # Create batch metadata
+        batch_id = interval_start.strftime("%Y%m%dT%H%M%SZ")
+        from src.generators.models import DriverEventBatch
+        batch_meta = DriverEventBatch(
+            batch_id=batch_id,
+            interval_start=interval_start,
+            interval_end=interval_end,
+            event_count=len(events),
+            seed=batch_seed
+        )
+        
+        # Write batch
+        generator.write_batch(events, batch_meta, output_dir)
+        
+        # Update manifest
+        manifest_path = "data/manifests/batch_manifest.json"
+        generator.update_manifest(manifest_path, batch_meta)
+        
+        batch_duration = (datetime.now(timezone.utc) - batch_start_time).total_seconds()
+        
+        if logger:
+            logger.info(
+                f"Initial driver batch generated: {batch_meta.event_count} events",
+                metadata={
+                    "batch_counter": batch_counter,
+                    "batch_id": batch_meta.batch_id,
+                    "event_count": batch_meta.event_count,
+                    "interval_start": interval_start.isoformat(),
+                    "interval_end": interval_end.isoformat(),
+                    "batch_duration_seconds": round(batch_duration, 3),
+                    "seed": batch_seed,
+                    "output_dir": output_dir
+                }
+            )
+        
+        batch_counter += 1
+        
+        # Save state
+        state.save(lifecycle, {
+            "last_driver_batch": batch_counter,
+            "last_driver_time": datetime.now(timezone.utc).isoformat(),
+            "last_interval_end": interval_end.isoformat()
+        })
+    
     while not lifecycle.should_shutdown():
         # Wait if paused
         if not lifecycle.wait_if_paused():

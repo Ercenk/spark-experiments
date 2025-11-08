@@ -306,8 +306,11 @@ class HealthServer:
                 driver_gen = DriverEventGenerator()
                 driver_config = driver_gen.load_config(self.config_path)
                 seed = driver_gen.get_seed("data/manifests/seed_manifest.json", seed_value)
-                now = datetime.now(timezone.utc)
-                interval_start, interval_end = driver_gen.compute_interval_bounds(now, 15)
+                # For auto-reinit, generate a batch for a previous interval
+                # Use 2 hours ago to ensure companies (just created now) existed before the interval
+                from datetime import timedelta
+                past_time = datetime.now(timezone.utc) - timedelta(hours=2)
+                interval_start, interval_end = driver_gen.compute_interval_bounds(past_time, 15)
                 driver_gen.generate_single_batch(
                     driver_config,
                     str(self.driver_events_dir),
