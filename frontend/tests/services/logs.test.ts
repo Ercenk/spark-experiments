@@ -11,7 +11,7 @@ describe('logs service', () => {
   });
 
   it('returns parsed entries', async () => {
-    mock.onGet('/logs').reply(200, {
+    mock.onGet('/api/logs').reply(200, {
       entries: [
         { ts: '2025-11-08T00:00:00Z', level: 'info', message: 'hello', source: 'orchestrator' }
       ],
@@ -23,7 +23,7 @@ describe('logs service', () => {
   });
 
   it('handles server error', async () => {
-    mock.onGet('/logs').reply(500, { error: 'boom' });
+    mock.onGet('/api/logs').reply(500, { error: 'boom' });
     await expect(fetchLogs({ limit: 5 })).rejects.toThrow();
   });
 });

@@ -38,46 +38,43 @@ This starts:
 
 ### 2. Runtime Control via HTTP
 
-The generator exposes REST endpoints on `http://localhost:18000`:
+Current REST surface is served exclusively under the mounted API blueprint prefix:
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/health` | GET | Full status payload (uptime, batch counters, lifecycle) |
-| `/status` | GET | Alias of `/health` |
-| `/pause` | POST | Pause continuous generation (idempotent) |
-| `/resume` | POST | Resume generation if paused (idempotent; may auto reinit after clean) |
-| `/clean` | POST | Delete generated data (requires paused) |
-| `/logs` | GET | Query structured log entries |
+| `/api/health` | GET | Aggregated health snapshot (status, uptime, batch counters) |
+| `/api/pause` | POST | Pause continuous generation (idempotent) |
+| `/api/resume` | POST | Resume generation; performs baseline initialization if missing |
+| `/api/clean` | POST | Delete generated data (requires paused) |
+| `/api/logs` | GET | Structured log entries with query params `limit`, `since`, `level` |
 
-PowerShell / curl examples:
+All root endpoints (`/health`, `/status`, `/pause`, `/resume`, `/clean`, `/logs`) have been **removed**. Use only `/api/*` paths.
+
+PowerShell / curl examples (new API):
 
 ```powershell
 # Recommended: install native jq (winget install jqlang.jq or choco install jq -y)
 
-# Health / status
-curl.exe -s http://localhost:18000/health | jq .status
-curl.exe -s http://localhost:18000/status | jq '.uptime.seconds'
+# Health / status (preferred new endpoint)
+curl.exe -s http://localhost:18000/api/health | jq .status
 
 # Pause and resume
-curl.exe -s -X POST http://localhost:18000/pause | jq .message
-curl.exe -s -X POST http://localhost:18000/resume | jq .message
+curl.exe -s -X POST http://localhost:18000/api/pause | jq .status
+curl.exe -s -X POST http://localhost:18000/api/resume | jq '.extra.baseline_actions'
 
 # Clean data (must be paused first)
-curl.exe -s -X POST http://localhost:18000/pause > $null
-curl.exe -s -X POST http://localhost:18000/clean | jq '.deleted_count'
-curl.exe -s -X POST http://localhost:18000/resume > $null
-
-# First resume after clean (if baseline data missing) triggers auto reinit
-curl.exe -s -X POST http://localhost:18000/resume | jq '.auto_reinit'
+curl.exe -s -X POST http://localhost:18000/api/pause > $null
+curl.exe -s -X POST http://localhost:18000/api/clean | jq '.deleted_count'
+curl.exe -s -X POST http://localhost:18000/api/resume > $null
 
 # Logs (limit + level + since)
-curl.exe -s "http://localhost:18000/logs?limit=5" | jq '.entries[] | {ts,level,message}'
-curl.exe -s "http://localhost:18000/logs?limit=10&level=error" | jq '.totalReturned'
-$since = (curl.exe -s "http://localhost:18000/logs?limit=5" | jq -r .nextSince)
-curl.exe -s "http://localhost:18000/logs?since=$( [uri]::EscapeDataString($since) )&limit=5" | jq '.entries | length'
+curl.exe -s "http://localhost:18000/api/logs?limit=5" | jq '.entries[] | {ts,level,message}'
+curl.exe -s "http://localhost:18000/api/logs?limit=10&level=error" | jq '.totalReturned'
+$since = (curl.exe -s "http://localhost:18000/api/logs?limit=5" | jq -r .nextSince)
+curl.exe -s "http://localhost:18000/api/logs?since=$( [uri]::EscapeDataString($since) )&limit=5" | jq '.entries | length'
 
 # PowerShell fallback (no jq):
-(Invoke-WebRequest http://localhost:18000/health).Content | ConvertFrom-Json | Select-Object -ExpandProperty status
+(Invoke-WebRequest http://localhost:18000/api/health).Content | ConvertFrom-Json | Select-Object -ExpandProperty status
 ```
 
 ### 3. Monitor Generation
@@ -220,14 +217,14 @@ MIT (for experimentation and learning)
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `curl : (7) Failed to connect` | Container not started | `docker compose ps`; `docker compose up -d` |
-| `/clean` returns 400 | Not paused | `curl -X POST /pause` then retry |
+| `/api/clean` returns 400 | Not paused | `curl -X POST /api/pause` then retry |
 | Logs empty | No batches yet / path cleared | Wait for next interval or inspect `data/manifests/logs` |
 | `idle_seconds` is null | No previous batch timestamp | Allow first batch to complete |
 | Since filter returns all logs | Timestamp not URL-encoded | Use `[uri]::EscapeDataString($since)` |
 
 ## HTTP Response Schema (Health)
 
-Subset of `GET /health` response (validated with Pydantic):
+Subset of `GET /api/health` response (validated with Pydantic):
 
 ```jsonc
 {
@@ -248,7 +245,7 @@ Subset of `GET /health` response (validated with Pydantic):
   1. Writes new `companies.jsonl` with configured `number_of_companies`
   2. Generates an initial driver event batch for current 15‑minute interval
 
-  Metadata appears in both `/resume` response and later `/health` calls:
+  Metadata appears in both `/api/resume` response and later `/api/health` calls:
 
   ```jsonc
   "auto_reinit": {

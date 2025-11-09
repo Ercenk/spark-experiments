@@ -34,7 +34,7 @@
 
 ## API Design Decisions
 
-### Logs Endpoint (`GET /logs`)
+### Logs Endpoint (`GET /api/logs`)
 Parameters:
 - `limit` (int, default 200, max 500)
 - `since` (ISO 8601 timestamp, optional)
@@ -52,8 +52,8 @@ Response:
 
 Decision: Provide `nextSince` for incremental fetching (future optimization). Initial implementation may ignore if not needed by UI.
 
-### Health & Status
-- Consolidate UI consumption: `/health` used for metrics; `/status` used for concise lifecycle snapshot. Cached client-side; health polls every 5s, status every 10s (stagger to reduce load).
+### Health
+- UI consumes `/api/health` (single unified snapshot) polled every 5s. All root endpoints removed.
 
 ### Control Actions
 - All POST actions return uniform `ControlResult` shape: `{ "success": true, "action": "pause", "timestamp": "...", "status": "paused" }`.

@@ -35,13 +35,13 @@ VITE_LOGS_LIMIT=500
 ```
 Defaults applied if unset.
 
-## API Consumption
-- Health: `GET /health` polled every 5s
-- Status: `GET /status` polled every 10s
-- Pause: `POST /pause`
-- Resume: `POST /resume`
-- Reset: `POST /clean` (only when paused)
-- Logs: `GET /logs?limit=200` (on demand + optional refresh)
+## API Consumption (Current)
+- Health: `GET /api/health` polled every 5s
+- Pause: `POST /api/pause`
+- Resume: `POST /api/resume`
+- Reset: `POST /api/clean` (only when paused)
+- Logs: `GET /api/logs?limit=200` (on demand + optional refresh)
+- All root endpoints removed; SPA relies solely on `/api/*`.
 
 ## Typical Workflow
 1. Start generator stack: `docker compose up -d` (from repo root if integrated)

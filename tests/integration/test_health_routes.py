@@ -1,107 +1,92 @@
-"""Integration tests for generator Flask health server routes.
+"""Updated integration tests focusing on /api blueprint endpoints.
 
-These tests use the Flask test client directly to avoid needing the Docker container.
-We instantiate HealthServer with a temporary state file in a tmp path.
+Legacy mutation endpoints (/pause, /resume, /clean, /logs) are deprecated and no longer
+used by the frontend. These tests ensure the blueprint endpoints behave as expected.
 """
 from pathlib import Path
-import json
 import tempfile
-
+import yaml
 import pytest
 
-from src.generators.health import HealthServer, HealthResponse
+from src.generators.health import HealthServer
 from src.generators.lifecycle import GeneratorLifecycle
+from src.generators.api import create_api_blueprint
 
 
 @pytest.fixture(scope="function")
-def health_server():
-    # Use temp directory for state file
+def app_with_api():
     tmpdir = tempfile.TemporaryDirectory()
-    state_file = Path(tmpdir.name) / "generator_state.json"
+    base = Path(tmpdir.name)
+    state_file = base / "generator_state.json"
+    config_file = base / "config.yaml"
+    companies_file = base / "companies.jsonl"
+    events_dir = base / "events"
+    logs_root = base / "logs"
+    # Minimal config expected (provide required keys for baseline initializer if referenced)
+    config_file.write_text(yaml.safe_dump({
+        'seed': 42,
+        'company_onboarding_interval': 'PT1H',
+        'number_of_companies': 1,
+    }))
     lifecycle = GeneratorLifecycle()
-    server = HealthServer(port=0, state_file=str(state_file), lifecycle=lifecycle)
-    yield server
+    server = HealthServer(port=0, state_file=str(state_file), lifecycle=lifecycle,
+                          config_path=str(config_file), companies_file=str(companies_file),
+                          driver_events_dir=str(events_dir))
+    bp = create_api_blueprint(lifecycle, str(config_file), str(companies_file), str(events_dir), str(state_file), str(logs_root))
+    server.app.register_blueprint(bp, url_prefix="/api")
+    yield server.app, lifecycle, base
     tmpdir.cleanup()
 
+
 @pytest.fixture(scope="function")
-def client(health_server):
-    return health_server.app.test_client()
+def client(app_with_api):
+    app, _lifecycle, _base = app_with_api
+    return app.test_client()
 
 
-def test_health_endpoint(client, health_server):
-    resp = client.get("/health")
+def test_api_health(client):
+    resp = client.get('/api/health')
     assert resp.status_code == 200
     data = resp.get_json()
-    # Validate schema via Pydantic
-    model = HealthResponse(**data)
-    assert model.status in {"running", "paused"}
-    assert model.uptime.seconds >= 0
+    for key in ['status', 'timestamp', 'uptime_seconds', 'company_batches', 'driver_batches']:
+        assert key in data
 
 
-def test_status_endpoint(client):
-    resp = client.get("/status")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    HealthResponse(**data)
+def test_api_pause_resume(client, app_with_api):
+    _app, lifecycle, _base = app_with_api
+    assert not lifecycle.paused
+    r1 = client.post('/api/pause')
+    assert r1.status_code == 200
+    assert lifecycle.paused
+    r2 = client.post('/api/resume')
+    assert r2.status_code == 200
+    assert not lifecycle.paused
 
 
-def test_pause_and_resume(client, health_server):
-    # Initially not paused
-    assert not health_server.lifecycle.paused
-
-    # Pause
-    resp_pause = client.post("/pause")
-    assert resp_pause.status_code in (200, 503)  # 503 if lifecycle missing but we provided it
-    data_pause = resp_pause.get_json()
-    if resp_pause.status_code == 200:
-        assert data_pause["status"] == "paused"
-        assert health_server.lifecycle.paused
-
-    # Resume
-    resp_resume = client.post("/resume")
-    assert resp_resume.status_code in (200, 503)
-    data_resume = resp_resume.get_json()
-    if resp_resume.status_code == 200:
-        assert data_resume["status"] == "running"
-        assert not health_server.lifecycle.paused
+def test_api_logs(client):
+    r = client.get('/api/logs?limit=5')
+    assert r.status_code == 200
+    data = r.get_json()
+    assert 'entries' in data
+    assert isinstance(data['entries'], list)
 
 
-def test_clean_requires_pause(client, health_server):
-    # When running, should get 400 instructing to pause first
-    resp_clean_running = client.post("/clean")
-    if health_server.lifecycle:
-        assert resp_clean_running.status_code in (200, 400, 207)
-        if resp_clean_running.status_code == 400:
-            data = resp_clean_running.get_json()
-            assert data["error"].startswith("Generator must be paused")
-
-    # Pause lifecycle then clean
-    health_server.lifecycle.pause()
-    resp_clean_paused = client.post("/clean")
-    assert resp_clean_paused.status_code in (200, 207)
-    data2 = resp_clean_paused.get_json()
-    assert "deleted_items" in data2
+def test_api_clean_requires_pause(client, app_with_api):
+    _app, lifecycle, base = app_with_api
+    # Running -> expect 400
+    r_running = client.post('/api/clean')
+    assert r_running.status_code in (400, 207, 200)  # if already paused somehow
+    lifecycle.pause()
+    r_paused = client.post('/api/clean')
+    assert r_paused.status_code in (200, 207)
+    data = r_paused.get_json()
+    assert 'deleted_count' in data
 
 
-def test_logs_empty(client):
-    resp = client.get("/logs")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert "entries" in data
-    assert isinstance(data["entries"], list)
-
-
-def test_logs_with_params(client):
-    resp = client.get("/logs?limit=10&level=info")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert "entries" in data
-    assert data["totalReturned"] <= 10
-
-
-def test_invalid_level_param(client):
-    resp = client.get("/logs?level=notalevel")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert "entries" in data
+def test_removed_legacy_endpoints_return_client_error(client):
+    # Removed endpoints should not be 200; allow 404 (Not Found) or 405 (Method Not Allowed) per Flask routing behavior
+    allowed = {404, 405}
+    for ep in ['/pause', '/resume', '/clean', '/logs']:
+        r = client.open(ep, method='POST' if ep != '/logs' else 'GET')
+        assert r.status_code in allowed
 

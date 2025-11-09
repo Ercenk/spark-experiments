@@ -72,10 +72,11 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
       args:
+        # Use host-mapped API for production bundle (host browser cannot resolve container DNS names)
         VITE_API_BASE: http://localhost:18000
     container_name: generator-frontend
     environment:
-      - VITE_API_BASE=http://generator:8000
+      - VITE_API_BASE=http://localhost:18000
     ports:
       - "19000:80"
     depends_on:
