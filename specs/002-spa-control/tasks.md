@@ -99,7 +99,7 @@
 
 ### Implementation
 - [ ] T045 [P] [US4] Create `ResetDialog.tsx` in `d:\Projects\spark-experiments\frontend\src\components\ResetDialog.tsx`
-- [ ] T046 [US4] Implement reset call (POST /clean) with guard (only if status paused) in `ResetDialog.tsx`
+- [ ] T046 [US4] Implement reset call (POST /api/clean) with guard (only if status paused) in `ResetDialog.tsx`
 - [ ] T047 [US4] Add confirmation flow & destructive warning in `ResetDialog.tsx`
 - [ ] T048 [US4] Display reset result (filesRemoved, durationMs) if available in `ResetDialog.tsx`
 - [ ] T049 [US4] Update global state post-reset (do not auto-resume) in `main.tsx`

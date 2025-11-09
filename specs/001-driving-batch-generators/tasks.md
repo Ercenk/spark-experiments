@@ -44,7 +44,7 @@ Spec: `specs/001-driving-batch-generators/spec.md`
 ## Phase 5: User Story 4 (P2) - REST Runtime Control
 
 - [ ] T026 [US4] Add lifecycle pause/resume integration checks in `src/generators/lifecycle.py` (verify existing)
-- [ ] T027 [US4] Implement /pause endpoint idempotency tests in `tests/integration/test_health_routes.py`
+- [ ] T027 [US4] Implement /api/pause endpoint idempotency tests in `tests/integration/test_health_routes.py`
 - [ ] T028 [US4] Implement /resume endpoint idempotency tests in `tests/integration/test_health_routes.py`
 - [ ] T029 [P] [US4] Add /clean precondition test (must be paused) in `tests/integration/test_health_routes.py`
 - [ ] T030 [US4] Add log query filtering test for level + since in `tests/integration/test_health_logs_detailed.py`

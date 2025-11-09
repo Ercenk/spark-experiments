@@ -147,7 +147,7 @@ info:
     HTTP endpoints exposed by the generator's embedded Flask `HealthServer` on internal port 8000 (mapped externally to 18000).
     Used by SPA for health display, log retrieval, and lifecycle control (pause/resume, clean reinit).
 servers:
-  - url: http://localhost:18000
+  - url: http://localhost:18000/api
     description: Local mapped port via Docker
 paths:
   /health:
@@ -201,14 +201,6 @@ paths:
                       at: { type: string, nullable: true }
                       actions: { type: array, items: { type: string } }
                       missing_files: { type: array, items: { type: string } }
-  /status:
-    get:
-      summary: Alias for /health
-      operationId: getStatus
-      tags: [health]
-      responses:
-        '200':
-          $ref: '#/components/responses/HealthResponse'
   /pause:
     post:
       summary: Pause generator

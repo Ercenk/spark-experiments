@@ -200,7 +200,7 @@ class HealthServer:
             return jsonify({
                 "success": False,
                 "error": "Generator must be paused before cleaning data",
-                "message": "Send POST to /pause first"
+                "message": "Send POST to /api/pause first"
             }), 400
         
         base_dir = Path(__file__).parent.parent.parent

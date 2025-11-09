@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: Control and observability endpoints consumed by Generator Control SPA
 servers:
-  - url: http://localhost:18000
+  - url: http://localhost:18000/api
 paths:
   /health:
     get:
@@ -17,17 +17,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthSnapshot'
-  /status:
-    get:
-      operationId: getStatus
-      summary: Get lifecycle status
-      responses:
-        '200':
-          description: Lifecycle status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LifecycleStatus'
   /pause:
     post:
       operationId: pauseGenerators
