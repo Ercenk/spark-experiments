@@ -11,7 +11,7 @@ describe('health service', () => {
   });
 
   it('parses backend-aligned health response', async () => {
-    mock.onGet('/health').reply(200, {
+    mock.onGet('/api/health').reply(200, {
       status: 'running',
       timestamp: '2025-11-08T00:00:00Z',
       uptime: { seconds: 10.5, hours: 0.01, start_time: '2025-11-08T00:00:00Z' },
@@ -28,7 +28,7 @@ describe('health service', () => {
   });
 
   it('handles error response', async () => {
-    mock.onGet('/health').reply(500, { error: 'fail' });
+    mock.onGet('/api/health').reply(500, { error: 'fail' });
     await expect(fetchHealth()).rejects.toThrow();
   });
 });

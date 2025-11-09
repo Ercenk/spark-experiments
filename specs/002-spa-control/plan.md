@@ -22,7 +22,7 @@ Deliver a single-page web interface (desktop-focused) allowing operations to: (1
 **Scale/Scope**: Single page, 4 primary UI action groups (Health, Controls, Reset, Logs)  
 
 Assumptions:
-- Existing endpoints: `/health`, `/status`, `/pause` (POST), `/resume` (POST), `/clean` (POST) already exposed by Python Flask thread.
+- Existing endpoints: `/api/health`, `/api/pause` (POST), `/api/resume` (POST), `/api/clean` (POST) already exposed by Python Flask blueprint.
 - New endpoint required for logs (proposed: `GET /logs?limit=500&level=info|warning|error&since=<iso8601>`). If declined later, fallback will tail container logs via `docker logs` (NOT preferred— breaks Principle I reproducibility for automation). 
 - Authentication not required (internal operator tool); if later required, wrapper proxy can enforce.
 - Log entries are structured JSON lines already (from existing `json_logger`).

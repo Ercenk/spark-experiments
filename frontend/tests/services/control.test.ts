@@ -11,19 +11,19 @@ describe('control services', () => {
   });
 
   it('pause success', async () => {
-    mock.onPost('/pause').reply(200, { success: true, action: 'pause', status: 'paused', timestamp: '2025-11-08T00:00:00Z' });
+    mock.onPost('/api/pause').reply(200, { success: true, action: 'pause', status: 'paused', timestamp: '2025-11-08T00:00:00Z' });
     const r = await pause();
     expect(r.status).toBe('paused');
   });
 
   it('resume success', async () => {
-    mock.onPost('/resume').reply(200, { success: true, action: 'resume', status: 'running', timestamp: '2025-11-08T00:00:00Z' });
+    mock.onPost('/api/resume').reply(200, { success: true, action: 'resume', status: 'running', timestamp: '2025-11-08T00:00:00Z' });
     const r = await resume();
     expect(r.status).toBe('running');
   });
 
   it('reset requires paused', async () => {
-    mock.onPost('/clean').reply(400, { error: 'must pause' });
+    mock.onPost('/api/clean').reply(400, { error: 'must pause' });
     await expect(reset()).rejects.toThrow();
   });
 });

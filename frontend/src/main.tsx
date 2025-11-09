@@ -48,13 +48,15 @@ function App() {
     <ThemeProvider>
       <ToastProvider>
         <ErrorBoundary>
-          <div className="app-container" style={{ padding: '1rem', maxWidth: 1000, margin: '0 auto' }}>
-            <div className="app-header">
-              <h1 style={{ margin: 0 }}>Generator Control SPA</h1>
-              <ThemeToggle />
+          <div className="app-shell">
+            <div className="app-container">
+              <div className="app-header">
+                <h1 style={{ margin: 0 }}>Generator Control SPA</h1>
+                <ThemeToggle />
+              </div>
+              <HealthPanel />
+              <LogsPanel />
             </div>
-            <HealthPanel />
-            <LogsPanel />
           </div>
         </ErrorBoundary>
       </ToastProvider>

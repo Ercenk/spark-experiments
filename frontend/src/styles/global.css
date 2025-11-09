@@ -1,22 +1,21 @@
 /* Global theming & layout foundation */
-html, body, #root { min-height: 100%; }
-html, body { margin: 0; padding: 0; }
-
-/* Light theme (default) */
+html, body { height: 100%; margin: 0; padding: 0; }
 html[data-theme='light'], body[data-theme='light'] { background-color: #ffffff; color: #1a1d21; }
-
-/* Dark theme */
 html[data-theme='dark'], body[data-theme='dark'] { background-color: #0f1115; color: #f5f7fa; }
-
-/* Ensure root container inherits text color */
-#root { color: inherit; }
-
-/* Smooth transitions for theme swaps without excessive motion */
 html[data-theme='light'], html[data-theme='dark'] { transition: background-color .25s ease, color .25s ease; }
 
+#root { height: 100%; display: flex; flex-direction: column; color: inherit; }
+#root > * { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+
+/* Shell + container layout */
+.app-shell { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.app-shell > * { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.app-container { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 1rem; max-width: 1000px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+
 /* App layout helpers */
-.app-container { min-height: 100vh; display: flex; flex-direction: column; }
 .app-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.logs-panel { flex: 1 1 auto; display: flex; flex-direction: column; margin-top: 1rem; }
+.logs-panel { flex: 1 1 0; display: flex; flex-direction: column; margin-top: 1rem; min-height: 0; /* allow child flex item to compute height */ }
 .logs-panel-controls { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
-.logs-panel-entries { flex: 1 1 auto; overflow-y: auto; margin-top: 0.5rem; font-family: monospace; font-size: 12px; border: 1px solid #ddd; padding: 4px; background: rgba(0,0,0,0.02); }
+/* Ensure the scrolling area can actually shrink/grow inside flex chain */
+.logs-panel-entries { flex: 1 1 0; min-height: 0; overflow-y: auto; margin-top: 0.5rem; font-family: monospace; font-size: 12px; border: 1px solid #ddd; padding: 4px; background: rgba(0,0,0,0.02); }
+.app-container > .logs-panel { min-height: 0; }

@@ -40,7 +40,7 @@ The generator container automatically generates the initial company batch on fir
 ## Step 3: Monitor Generator Status
 Check the health and status of the running generators:
 ```bash
-curl http://localhost:18000/status | python -m json.tool
+curl http://localhost:18000/api/health | python -m json.tool
 ```
 
 This returns comprehensive statistics including:
@@ -56,23 +56,23 @@ The generator runs continuously, but you can control it via REST API:
 
 ### Pause Generation
 ```bash
-curl -X POST http://localhost:18000/pause
+curl -X POST http://localhost:18000/api/pause
 ```
 Response: `{"success": true, "message": "Generator paused successfully", "status": "paused"}`
 
 ### Resume Generation
 ```bash
-curl -X POST http://localhost:18000/resume
+curl -X POST http://localhost:18000/api/resume
 ```
 Response: `{"success": true, "message": "Generator resumed successfully", "status": "running"}`
 
 ### Clean All Data (requires paused state)
 ```bash
 # First pause the generator
-curl -X POST http://localhost:18000/pause
+curl -X POST http://localhost:18000/api/pause
 
 # Then clean the data
-curl -X POST http://localhost:18000/clean
+curl -X POST http://localhost:18000/api/clean
 ```
 Response includes deleted items, counts, and cleanup status. After cleaning, restart the container:
 ```bash
@@ -116,15 +116,14 @@ docker compose exec generator sh -c "cat /data/raw/events/<batch_id>/batch_meta.
 
 ## REST API Endpoints
 
-The generator exposes the following REST API endpoints on port 18000:
+The generator exposes the following REST API endpoints on port 18000 under the `/api` prefix:
 
 | Endpoint | Method | Purpose | Response |
 |----------|--------|---------|----------|
-| `/health` | GET | Health check with detailed stats | JSON with status, uptime, batch counts |
-| `/status` | GET | Alias for /health | Same as /health |
-| `/pause` | POST | Pause generation | JSON with success status |
-| `/resume` | POST | Resume generation | JSON with success status |
-| `/clean` | POST | Clean all data (requires paused) | JSON with deleted items |
+| `/api/health` | GET | Health check with detailed stats | JSON with status, uptime, batch counts |
+| `/api/pause` | POST | Pause generation | JSON with success status |
+| `/api/resume` | POST | Resume generation | JSON with success status |
+| `/api/clean` | POST | Clean all data (requires paused) | JSON with deleted items |
 
 ## Teardown
 ```bash
@@ -137,8 +136,8 @@ docker compose down -v
 
 Alternatively, use the REST API to clean data while keeping containers running:
 ```bash
-curl -X POST http://localhost:18000/pause
-curl -X POST http://localhost:18000/clean
+curl -X POST http://localhost:18000/api/pause
+curl -X POST http://localhost:18000/api/clean
 docker compose restart generator
 ```
 

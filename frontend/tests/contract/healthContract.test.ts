@@ -6,7 +6,7 @@ import { HealthResponseSchema } from '../../src/services/schemas';
 describe('contract: health endpoint', () => {
   it('matches schema shape', async () => {
     try {
-      const resp = await axios.get('http://localhost:18000/health', { timeout: 3000 });
+      const resp = await axios.get('http://localhost:18000/api/health', { timeout: 3000 });
       const parsed = HealthResponseSchema.parse(resp.data);
       expect(parsed.status).toMatch(/running|paused/);
       expect(parsed.uptime.seconds).toBeGreaterThanOrEqual(0);

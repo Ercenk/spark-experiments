@@ -107,21 +107,21 @@ prevent data corruption.
 disruptive container restarts during experiments; provides observability into
 generation progress.
 
-**Independent Test**: Start generators; call GET /status to verify running state
-and batch counts; call POST /pause to pause; verify no new batches generated;
-call POST /resume; confirm generation resumes.
+**Independent Test**: Start generators; call GET /api/health to verify running state
+and batch counts; call POST /api/pause to pause; verify no new batches generated;
+call POST /api/resume; confirm generation resumes.
 
 **Acceptance Scenarios**:
 
-1. **Given** generator is running, **When** GET /health called, **Then** response
+1. **Given** generator is running, **When** GET /api/health called, **Then** response
   includes status="running", uptime, batch counts, and idle time metrics.
-2. **Given** generator is running, **When** POST /pause called, **Then** generation
-  stops and subsequent /status shows status="paused".
-3. **Given** generator is paused, **When** POST /resume called, **Then** generation
+2. **Given** generator is running, **When** POST /api/pause called, **Then** generation
+  stops and subsequent GET /api/health shows status="paused".
+3. **Given** generator is paused, **When** POST /api/resume called, **Then** generation
   resumes from next scheduled interval.
-4. **Given** generator is paused, **When** POST /clean called, **Then** all data
+4. **Given** generator is paused, **When** POST /api/clean called, **Then** all data
   files deleted and success response returned with deleted item counts.
-5. **Given** generator is running (not paused), **When** POST /clean called,
+5. **Given** generator is running (not paused), **When** POST /api/clean called,
   **Then** error response returned requiring pause first.
 
 ---
@@ -165,11 +165,11 @@ call POST /resume; confirm generation resumes.
 - **FR-014**: System MUST log discarded events (e.g., missing truck_id) with reason code in a JSON Lines log.
 - **FR-015**: System MUST schedule company onboarding generation at a cadence independent from 15-minute driver batches (e.g., hourly configurable) using internal loop (no external API/orchestrator).
 - **FR-016**: System MUST ensure driver event batches reference only companies existing before interval_start; new companies appear starting next interval.
-- **FR-017**: System MUST provide REST API endpoints for runtime control: GET /health (status), GET /status (alias), POST /pause (pause generators), POST /resume (resume generators), POST /clean (clean all data).
+- **FR-017**: System MUST provide REST API endpoints for runtime control: GET /api/health (status), POST /api/pause (pause generators), POST /api/resume (resume generators), POST /api/clean (clean all data).
 - **FR-018**: System MUST write a dataset descriptor `manifests/dataset.md` capturing configuration snapshot and seed after first successful run.
 - **FR-019**: System MUST model event generation randomness using Poisson inter-arrival (lambda derived from configured event_rate_per_driver) and weighted static probabilities for categorical attributes (event_type, active status) with weights recorded in configuration or defaults documented in data model.
 - **FR-020**: System MUST automatically generate initial company batch on first startup if no companies.jsonl exists or file is empty.
-- **FR-021**: System MUST expose health monitoring endpoint returning: generator status (running/paused), uptime, batch counts, last generation times, and idle durations.
+- **FR-021**: System MUST expose a health monitoring endpoint (`GET /api/health`) returning: generator status (running/paused), uptime, batch counts, last generation times, and idle durations.
 - **FR-022**: System MUST require generators to be paused before allowing data cleanup via REST API.
 
 *Assumptions: No authentication/security requirements for local experimentation; persistence mechanism abstracted (could be file-based or memory) but spec focuses on data semantics.*
