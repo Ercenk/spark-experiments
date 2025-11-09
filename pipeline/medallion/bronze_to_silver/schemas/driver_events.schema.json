@@ -1,0 +1,14 @@
+{
+  "name": "bronze_driver_events",
+  "layer": "bronze",
+  "description": "Raw driver event record schema placeholder",
+  "columns": [
+    {"name": "driver_id", "type": "string", "required": true},
+    {"name": "event_timestamp", "type": "timestamp", "required": true},
+    {"name": "event_type", "type": "string", "required": true},
+    {"name": "company_id", "type": "string", "required": false},
+    {"name": "payload", "type": "struct", "required": false},
+    {"name": "source_file_name", "type": "string", "required": true}
+  ],
+  "status": "PLACEHOLDER"
+}

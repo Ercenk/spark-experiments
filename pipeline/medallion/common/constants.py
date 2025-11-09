@@ -1,0 +1,7 @@
+RAW_EVENTS_DIR = "data/raw/events"
+RAW_COMPANIES_FILE = "data/raw/companies.jsonl"
+PROCESSED_BASE = "data/processed/medallion"
+SILVER_DRIVER_EVENTS = f"{PROCESSED_BASE}/silver/driver_events"
+SILVER_COMPANIES = f"{PROCESSED_BASE}/silver/companies"
+MANIFESTS_DIR = "data/manifests"
+PROCESSED_FILES_MANIFEST = f"{MANIFESTS_DIR}/processed_files.json"

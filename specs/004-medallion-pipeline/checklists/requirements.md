@@ -3,7 +3,6 @@
 **Purpose**: Validate specification completeness and quality before proceeding to planning  
 **Created**: 2025-11-08  
 **Feature**: ./spec.md
-**Renamed From**: 001-medallion-pipeline (directory + branch number adjusted for global sequencing)
 
 ## Content Quality
 

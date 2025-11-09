@@ -1,0 +1,16 @@
+{
+  "name": "silver_driver_events",
+  "layer": "silver",
+  "description": "Curated driver events with quality flags and lineage",
+  "columns": [
+    {"name": "driver_id", "type": "string"},
+    {"name": "event_timestamp", "type": "timestamp"},
+    {"name": "event_type", "type": "string"},
+    {"name": "company_id", "type": "string"},
+    {"name": "is_duplicate", "type": "boolean"},
+    {"name": "is_valid", "type": "boolean"},
+    {"name": "raw_source_file", "type": "string"},
+    {"name": "load_run_id", "type": "string"}
+  ],
+  "status": "PLACEHOLDER"
+}

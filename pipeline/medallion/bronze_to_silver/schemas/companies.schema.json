@@ -1,0 +1,13 @@
+{
+  "name": "bronze_companies",
+  "layer": "bronze",
+  "description": "Raw company record schema placeholder",
+  "columns": [
+    {"name": "company_id", "type": "string", "required": true},
+    {"name": "name", "type": "string", "required": true},
+    {"name": "sector", "type": "string", "required": false},
+    {"name": "size_indicator", "type": "string", "required": false},
+    {"name": "source_file_name", "type": "string", "required": true}
+  ],
+  "status": "PLACEHOLDER"
+}

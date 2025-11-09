@@ -1,0 +1,14 @@
+{
+  "name": "silver_companies",
+  "layer": "silver",
+  "description": "Curated company reference data with completeness flags",
+  "columns": [
+    {"name": "company_id", "type": "string"},
+    {"name": "name", "type": "string"},
+    {"name": "sector", "type": "string"},
+    {"name": "size_indicator", "type": "string"},
+    {"name": "raw_source_file", "type": "string"},
+    {"name": "load_run_id", "type": "string"}
+  ],
+  "status": "PLACEHOLDER"
+}
