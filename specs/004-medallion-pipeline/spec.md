@@ -1,6 +1,6 @@
 # Feature Specification: Medallion Data Pipeline
 
-**Feature Branch**: `001-medallion-pipeline`  
+**Feature Branch**: `004-medallion-pipeline`  
 **Created**: 2025-11-08  
 **Status**: Draft  
 **Input**: User description: "Build a data pipeline with medallion architecture. Initial step transfers raw to silver, then transforms and enriches driver data with company data."
