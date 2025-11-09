@@ -1,0 +1,360 @@
+openapi: 3.1.0
+info:
+  title: Generator Operations API (Decoupled)
+  version: 0.2.0
+  description: Read-only health and lifecycle/data reset/log retrieval via /api prefix
+servers:
+  - url: http://localhost:18000/api
+paths:
+  /health:
+    get:
+      operationId: getHealthSnapshot
+      summary: Get read-only health snapshot
+      tags: [health]
+      responses:
+        '200':
+          description: Health snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthSnapshot'
+  /pause:
+    post:
+      operationId: pauseGenerators
+      summary: Pause all generators
+      tags: [lifecycle]
+      responses:
+        '200':
+          description: Pause result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+  /resume:
+    post:
+      operationId: resumeGenerators
+      summary: Resume all generators (baseline ensured)
+      tags: [lifecycle]
+      responses:
+        '200':
+          description: Resume result with baseline verification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeResult'
+  /clean:
+    post:
+      operationId: cleanData
+      summary: Reset generated data (requires paused state)
+      tags: [data-reset]
+      responses:
+        '200':
+          description: Reset result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanResult'
+        '400':
+          description: Must pause before cleaning
+  /logs:
+    get:
+      operationId: getLogs
+      summary: Retrieve recent log entries
+      tags: [logs]
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        - in: query
+          name: since
+          schema: { type: string, format: date-time }
+        - in: query
+          name: level
+          schema: { type: string, enum: [info, warning, error] }
+      responses:
+        '200':
+          description: Logs response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogsResponse'
+components:
+  schemas:
+    HealthSnapshot:
+      type: object
+      properties:
+        status: { type: string, enum: [running, paused] }
+        timestamp: { type: string, format: date-time }
+        uptime_seconds: { type: number }
+        start_time: { type: string, format: date-time }
+        company_batches: { type: integer, minimum: 0 }
+        driver_batches: { type: integer, minimum: 0 }
+        last_company_time: { type: string, format: date-time, nullable: true }
+        last_driver_time: { type: string, format: date-time, nullable: true }
+        paused: { type: boolean }
+        shutdown_requested: { type: boolean }
+        verification:
+          type: object
+          properties:
+            companies_exists: { type: boolean }
+            events_exists: { type: boolean }
+            missing: { type: array, items: { type: string } }
+            event_file_count: { type: integer, minimum: 0 }
+      required: [status, timestamp, uptime_seconds, start_time, company_batches, driver_batches, paused]
+    CommandResult:
+      type: object
+      properties:
+        success: { type: boolean }
+        action: { type: string, enum: [pause, resume] }
+        status: { type: string, enum: [running, paused] }
+        timestamp: { type: string, format: date-time }
+        message: { type: string }
+        error: { type: string, nullable: true }
+        extra: { type: object, nullable: true }
+      required: [success, action, status, timestamp]
+    ResumeResult:
+      allOf:
+        - $ref: '#/components/schemas/CommandResult'
+    CleanResult:
+      type: object
+      properties:
+        success: { type: boolean }
+        deleted_count: { type: integer, minimum: 0 }
+        errors: { type: array, items: { type: string } }
+      required: [success, deleted_count, errors]
+    LogEntry:
+      type: object
+      properties:
+        ts: { type: string, format: date-time }
+        level: { type: string, enum: [info, warning, error] }
+        message: { type: string }
+        source: { type: string }
+        context: { type: object }
+      required: [ts, level, message]
+    LogsResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items: { $ref: '#/components/schemas/LogEntry' }
+        totalReturned: { type: integer }
+        nextSince: { type: string, format: date-time, nullable: true }
+      required: [entries, totalReturned]openapi: 3.1.0
+info:
+  title: Generator Control & Monitoring API
+  version: 1.0.0
+  description: |
+    HTTP endpoints exposed by the generator's embedded Flask `HealthServer` on internal port 8000 (mapped externally to 18000).
+    Used by SPA for health display, log retrieval, and lifecycle control (pause/resume, clean reinit).
+servers:
+  - url: http://localhost:18000
+    description: Local mapped port via Docker
+paths:
+  /health:
+    get:
+      summary: Current health and status snapshot
+      operationId: getHealth
+      tags: [health]
+      responses:
+        '200':
+          description: Health snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [running, paused] }
+                  timestamp: { type: string, format: date-time }
+                  uptime:
+                    type: object
+                    properties:
+                      seconds: { type: number }
+                      hours: { type: number }
+                      start_time: { type: string, format: date-time }
+                  company_generator:
+                    type: object
+                    properties:
+                      total_batches: { type: integer }
+                      last_batch_time: { type: string, nullable: true }
+                      idle_seconds: { type: number, nullable: true }
+                  driver_generator:
+                    type: object
+                    properties:
+                      total_batches: { type: integer }
+                      last_batch_time: { type: string, nullable: true }
+                      last_interval_end: { type: string, nullable: true }
+                      idle_seconds: { type: number, nullable: true }
+                  lifecycle:
+                    type: object
+                    properties:
+                      paused: { type: boolean }
+                      shutdown_requested: { type: boolean }
+                  state:
+                    type: object
+                    properties:
+                      last_saved: { type: string, nullable: true }
+                      state_file: { type: string }
+                  auto_reinit:
+                    type: object
+                    properties:
+                      performed: { type: boolean }
+                      at: { type: string, nullable: true }
+                      actions: { type: array, items: { type: string } }
+                      missing_files: { type: array, items: { type: string } }
+  /status:
+    get:
+      summary: Alias for /health
+      operationId: getStatus
+      tags: [health]
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthResponse'
+  /pause:
+    post:
+      summary: Pause generator
+      operationId: pauseGenerator
+      tags: [lifecycle]
+      responses:
+        '200':
+          description: Pause result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  status: { type: string, enum: [paused] }
+                  timestamp: { type: string, format: date-time }
+        '503':
+          description: Lifecycle unavailable
+  /resume:
+    post:
+      summary: Resume generator (may trigger auto reinitialization)
+      operationId: resumeGenerator
+      tags: [lifecycle]
+      responses:
+        '200':
+          description: Resume result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  status: { type: string, enum: [running] }
+                  timestamp: { type: string, format: date-time }
+                  auto_reinit:
+                    type: object
+                    properties:
+                      performed: { type: boolean }
+                      at: { type: string, nullable: true }
+                      actions: { type: array, items: { type: string } }
+                      missing_files: { type: array, items: { type: string } }
+        '503':
+          description: Lifecycle unavailable
+  /clean:
+    post:
+      summary: Clean generated data (requires paused state)
+      operationId: cleanData
+      tags: [maintenance]
+      responses:
+        '200':
+          description: Cleanup success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  deleted_count: { type: integer }
+                  deleted_items: { type: array, items: { type: object } }
+                  timestamp: { type: string, format: date-time }
+                  message: { type: string }
+        '400':
+          description: Must pause first
+        '207':
+          description: Partial errors during cleanup
+  /logs:
+    get:
+      summary: Retrieve recent log entries with optional filters
+      operationId: getLogs
+      tags: [logs]
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+        - in: query
+          name: since
+          schema: { type: string, format: date-time }
+        - in: query
+          name: level
+          schema: { type: string, enum: [info, warning, error] }
+      responses:
+        '200':
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ts: { type: string, format: date-time }
+                        level: { type: string }
+                        message: { type: string }
+                        source: { type: string }
+                        context: { type: object }
+                  totalReturned: { type: integer }
+                  nextSince: { type: string, nullable: true }
+components:
+  responses:
+    HealthResponse:
+      description: Health snapshot
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, enum: [running, paused] }
+              timestamp: { type: string, format: date-time }
+              uptime:
+                type: object
+                properties:
+                  seconds: { type: number }
+                  hours: { type: number }
+                  start_time: { type: string, format: date-time }
+              company_generator:
+                type: object
+                properties:
+                  total_batches: { type: integer }
+                  last_batch_time: { type: string, nullable: true }
+                  idle_seconds: { type: number, nullable: true }
+              driver_generator:
+                type: object
+                properties:
+                  total_batches: { type: integer }
+                  last_batch_time: { type: string, nullable: true }
+                  last_interval_end: { type: string, nullable: true }
+                  idle_seconds: { type: number, nullable: true }
+              lifecycle:
+                type: object
+                properties:
+                  paused: { type: boolean }
+                  shutdown_requested: { type: boolean }
+              state:
+                type: object
+                properties:
+                  last_saved: { type: string, nullable: true }
+                  state_file: { type: string }
+              auto_reinit:
+                type: object
+                properties:
+                  performed: { type: boolean }
+                  at: { type: string, nullable: true }
+                  actions: { type: array, items: { type: string } }
+                  missing_files: { type: array, items: { type: string } }

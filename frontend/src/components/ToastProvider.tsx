@@ -21,9 +21,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const push = useCallback((m: ToastMessage) => {
     setMessages((prev) => [...prev, m]);
+    const ttl = m.type === 'error' ? 7000 : m.type === 'success' ? 4000 : 5000;
     setTimeout(() => {
       setMessages((prev) => prev.filter((x) => x.id !== m.id));
-    }, 5000);
+    }, ttl);
   }, []);
 
   const showSuccess = useCallback((text: string) => push(makeMessage('success', text)), [push]);
@@ -35,23 +36,37 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ messages, showSuccess, showError, showInfo, dismiss }}>
       {children}
       <div style={{ position: 'fixed', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 1000 }}>
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            style={{
-              padding: '8px 12px',
-              borderRadius: 4,
-              background: m.type === 'error' ? '#d13438' : m.type === 'success' ? '#107c10' : '#6264a7',
-              color: '#fff',
-              minWidth: 240,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{m.text}</span>
-              <Button appearance="transparent" size="small" onClick={() => dismiss(m.id)}>×</Button>
+        {messages.map((m) => {
+          const bg = m.type === 'error'
+            ? '#dc2626'
+            : m.type === 'success'
+              ? '#16a34a'
+              : '#4f46e5';
+          return (
+            <div
+              key={m.id}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 6,
+                background: bg,
+                color: '#fff',
+                minWidth: 260,
+                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong style={{ fontSize: 13 }}>
+                  {m.type === 'error' ? 'Error' : m.type === 'success' ? 'Success' : 'Info'}
+                </strong>
+                <Button appearance="transparent" size="small" onClick={() => dismiss(m.id)}>×</Button>
+              </div>
+              <span style={{ fontSize: 12 }}>{m.text}</span>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

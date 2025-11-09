@@ -90,30 +90,24 @@ class HealthServer:
         self.auto_reinit_actions: List[str] = []
         self.auto_reinit_missing: List[str] = []
         
-        # Register routes
-        @self.app.route('/health', methods=['GET'])
-        def health():
-            return self._get_health_status()
-        
-        @self.app.route('/status', methods=['GET'])
-        def status():
-            return self._get_health_status()
-        
-        @self.app.route('/pause', methods=['POST'])
-        def pause():
-            return self._pause_generator()
-        
-        @self.app.route('/resume', methods=['POST'])
-        def resume():
-            return self._resume_generator()
-        
-        @self.app.route('/clean', methods=['POST'])
-        def clean():
-            return self._clean_data()
+        # Root health endpoints removed; health served exclusively via /api/health blueprint.
 
-        @self.app.route('/logs', methods=['GET'])
-        def logs():
-            return self._get_logs()
+        # CORS headers for SPA access from different host/port (e.g., Vite dev server)
+        @self.app.after_request
+        def add_cors_headers(resp):  # type: ignore
+            resp.headers['Access-Control-Allow-Origin'] = '*'
+            resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+            return resp
+
+        # Generic OPTIONS handler for CORS preflight
+        @self.app.route('/<path:_any>', methods=['OPTIONS'])
+        def cors_options(_any):  # type: ignore
+            return ('', 204)
+
+        @self.app.route('/', methods=['OPTIONS'])
+        def cors_options_root():  # type: ignore
+            return ('', 204)
     
     def _get_health_status(self):
         """Get current health and status information with comprehensive statistics."""
@@ -195,138 +189,7 @@ class HealthServer:
         validated = HealthResponse(**raw_response)
         return jsonify(validated.model_dump())
     
-    def _pause_generator(self):
-        """Pause the generator via REST API."""
-        if not self.lifecycle:
-            return jsonify({
-                "success": False,
-                "error": "Lifecycle management not available"
-            }), 503
-        
-        if self.lifecycle.paused:
-            return jsonify({
-                "success": False,
-                "message": "Generator is already paused",
-                "status": "paused"
-            }), 200
-        
-        self.lifecycle.pause()
-        return jsonify({
-            "success": True,
-            "message": "Generator paused successfully",
-            "status": "paused",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }), 200
-    
-    def _resume_generator(self):
-        """Resume the generator via REST API, performing auto reinitialization if data was cleaned."""
-        if not self.lifecycle:
-            return jsonify({
-                "success": False,
-                "error": "Lifecycle management not available"
-            }), 503
-        
-        if not self.lifecycle.paused:
-            return jsonify({
-                "success": False,
-                "message": "Generator is not paused",
-                "status": "running"
-            }), 200
-        
-        self.lifecycle.resume()
-
-        # Attempt auto reinit if baseline data is missing and config provided
-        self._auto_reinitialize_if_needed()
-
-        return jsonify({
-            "success": True,
-            "message": "Generator resumed successfully",
-            "status": "running",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "auto_reinit": {
-                "performed": self.auto_reinit_performed,
-                "at": self.auto_reinit_time,
-                "actions": self.auto_reinit_actions,
-                "missing_files": self.auto_reinit_missing
-            }
-        }), 200
-
-    def _auto_reinitialize_if_needed(self):
-        """Detect missing baseline files and regenerate them once immediately after resume.
-
-        Companies baseline: companies.jsonl must exist and be non-empty.
-        Driver events: at least one batch file in events directory.
-        Requires config_path to be provided at HealthServer initialization.
-        """
-        if self.auto_reinit_performed:
-            return  # already done once
-
-        missing = []
-        if not self.companies_file.exists() or self.companies_file.stat().st_size == 0:
-            missing.append(str(self.companies_file))
-        if (not self.driver_events_dir.exists()) or (len(list(self.driver_events_dir.glob('*.json'))) == 0 and len(list(self.driver_events_dir.glob('*.jsonl'))) == 0):
-            missing.append(str(self.driver_events_dir))
-
-        if not missing or not self.config_path:
-            # Nothing to do or insufficient context
-            self.auto_reinit_missing = missing
-            return
-
-        self.driver_events_dir.mkdir(parents=True, exist_ok=True)
-        self.companies_file.parent.mkdir(parents=True, exist_ok=True)
-
-        actions = []
-        try:
-            # Load config for company count & seed
-            with open(self.config_path, 'r') as f:
-                config_data = yaml.safe_load(f)
-            company_count = int(config_data.get('number_of_companies', 0) or 0)
-            seed_value = int(config_data.get('seed', 42))
-        except Exception:
-            # Cannot proceed without config
-            self.auto_reinit_missing = missing
-            return
-
-        # Generate companies if missing
-        if str(self.companies_file) in missing:
-            try:
-                from src.generators.company_generator import CompanyGenerator
-                generator = CompanyGenerator()
-                seed = generator.get_seed("data/manifests/seed_manifest.json", seed_value)
-                companies = generator.generate_companies(company_count, seed)
-                generator.write_companies_jsonl(companies, str(self.companies_file))
-                actions.append(f"companies:{company_count}")
-            except Exception as e:
-                actions.append(f"companies:error:{e}")
-
-        # Generate initial driver batch if missing events
-        if str(self.driver_events_dir) in missing:
-            try:
-                from src.generators.driver_event_generator import DriverEventGenerator
-                driver_gen = DriverEventGenerator()
-                driver_config = driver_gen.load_config(self.config_path)
-                seed = driver_gen.get_seed("data/manifests/seed_manifest.json", seed_value)
-                # For auto-reinit, generate a batch for a previous interval
-                # Use 2 hours ago to ensure companies (just created now) existed before the interval
-                from datetime import timedelta
-                past_time = datetime.now(timezone.utc) - timedelta(hours=2)
-                interval_start, interval_end = driver_gen.compute_interval_bounds(past_time, 15)
-                driver_gen.generate_single_batch(
-                    driver_config,
-                    str(self.driver_events_dir),
-                    str(self.companies_file),
-                    seed,
-                    interval_start,
-                    interval_end
-                )
-                actions.append("driver_batch:1")
-            except Exception as e:
-                actions.append(f"driver_batch:error:{e}")
-
-        self.auto_reinit_performed = True
-        self.auto_reinit_time = datetime.now(timezone.utc).isoformat()
-        self.auto_reinit_actions = actions
-        self.auto_reinit_missing = missing
+    # Legacy mutation methods removed with deprecation cleanup
     
     def _clean_data(self):
         """Clean all generated data files via REST API."""
@@ -395,6 +258,12 @@ class HealthServer:
         (data_dir / "staged").mkdir(parents=True, exist_ok=True)
         (data_dir / "processed").mkdir(parents=True, exist_ok=True)
         
+        # Reset auto reinit flags so next resume can run baseline generation
+        self.auto_reinit_performed = False
+        self.auto_reinit_time = None
+        self.auto_reinit_actions = []
+        self.auto_reinit_missing = []
+
         response = {
             "success": len(errors) == 0,
             "deleted_count": len(deleted),

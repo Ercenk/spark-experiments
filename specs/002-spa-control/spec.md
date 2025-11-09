@@ -3,7 +3,7 @@
 **Feature Branch**: `002-spa-control`  
 **Created**: 2025-11-08  
 **Status**: Draft  
-**Input**: User description: "A single page application controls the generators, exposing, health, logs, pause, resume, reset actions"
+**Input**: User description: "A single page application controls the generators, exposing health, logs, pause, resume, reset actions via /api endpoints"
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -137,10 +137,10 @@ Operations team needs to clear all generated data and restart generation from sc
 
 ### Key Entities
 
-- **Generator**: Represents a data generation process with attributes: type (company/driver-event), status (running/paused), uptime, batch count, last activity timestamp
-- **Health Status**: Aggregated view of all generators showing overall system health, total batches, generation rate, uptime
-- **Log Entry**: Individual log message with timestamp, level (info/warning/error), source generator, message text
-- **Control Action**: User-initiated operation (pause/resume/reset) with timestamp, user identifier, result status, error message if failed
+- **Generator**: Represents a data generation process with attributes: type (company/driver-event), status (running/paused), uptime, batch count, last activity timestamp (source: `/api/health`)
+- **Health Status**: Aggregated view of all generators showing overall system health, total batches, generation rate, uptime (source: `/api/health`)
+- **Log Entry**: Individual log message with timestamp, level (info/warning/error), source generator, message text (retrieved from `/api/logs`)
+- **Control Action**: User-initiated operation (pause/resume/reset) with timestamp, result status, error message if failed (executed through `/api/pause`, `/api/resume`, `/api/clean`)
 
 ## Success Criteria *(mandatory)*
 

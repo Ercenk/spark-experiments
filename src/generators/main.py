@@ -423,6 +423,12 @@ Examples:
     
     # Start health server
     from src.generators.health import HealthServer
+    # Optional new blueprint-based API (not yet replacing HealthServer routes)
+    try:
+        from src.generators.api import create_api_blueprint  # type: ignore
+        _HAVE_BLUEPRINT = True
+    except Exception:  # pragma: no cover - defensive
+        _HAVE_BLUEPRINT = False
     # Provide config & data paths to enable auto reinit in resume
     health_server = HealthServer(
         port=8000,
@@ -433,6 +439,22 @@ Examples:
     )
     health_server.start_background()
     logger.info("Health server started on port 8000 (mapped to 18000 externally) with pause/resume endpoints")
+
+    # Attach new blueprint for decoupled handlers (experimental)
+    if _HAVE_BLUEPRINT:
+        try:
+            bp = create_api_blueprint(
+                lifecycle=lifecycle,
+                config_path=args.config,
+                companies_file=(args.companies if args.companies else "data/raw/companies.jsonl"),
+                events_dir=(args.output if args.mode == 'driver' else "data/raw/events"),
+                state_file="data/manifests/generator_state.json",
+                logs_root="data/manifests/logs",
+            )
+            health_server.app.register_blueprint(bp, url_prefix="/api")
+            logger.info("Experimental API blueprint mounted at /api")
+        except Exception as e:  # pragma: no cover - defensive
+            logger.error(f"Failed to mount API blueprint: {e}")
     
     # Load previous state
     prev_state = state.load()

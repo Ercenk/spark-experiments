@@ -56,11 +56,15 @@ export const LogsPanel: React.FC = () => {
   }, [autoRefresh, load]);
 
   return (
-    <div style={{ marginTop: '1rem' }}>
-      <h2 style={{ marginBottom: '0.5rem' }}>Recent Logs (stub)</h2>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+    <div className="logs-panel">
+      <h2 style={{ marginBottom: '0.5rem' }}>Recent Logs</h2>
+      <div className="logs-panel-controls">
         <Button onClick={load} disabled={loading}>Refresh</Button>
-        <Switch checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)}>Auto-refresh</Switch>
+        <Switch
+          checked={autoRefresh}
+          label="Auto-refresh"
+          onChange={(_, data) => setAutoRefresh(!!data.checked)}
+        />
         <Dropdown placeholder="Level" selectedOptions={level ? [level] : []} onOptionSelect={(_, data) => setLevel(data.optionValue === 'all' ? undefined : data.optionValue)}>
           <Option value="all">All</Option>
           <Option value="info">Info</Option>
@@ -71,7 +75,7 @@ export const LogsPanel: React.FC = () => {
       </div>
       {loading && <Spinner label="Loading logs" />}
       {error && <div style={{ color: '#d13438' }}>Error: {error}</div>}
-      <div style={{ maxHeight: 320, overflowY: 'auto', marginTop: '0.5rem', fontFamily: 'monospace', fontSize: 12, border: '1px solid #ddd', padding: '4px' }}>
+      <div className="logs-panel-entries">
         {entries.map((e) => (
           <div key={e.ts + e.message}>
             <strong>[{e.level}]</strong> {e.ts} {e.source ? '(' + e.source + ') ' : ''}- {e.message}

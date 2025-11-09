@@ -10,6 +10,7 @@ import pytest
 
 from src.generators.health import HealthServer
 from src.generators.lifecycle import GeneratorLifecycle
+from src.generators.api import create_api_blueprint
 
 
 @pytest.fixture()
@@ -50,7 +51,10 @@ def log_setup(tmp_path):
 @pytest.fixture()
 def server():
     lifecycle = GeneratorLifecycle()
-    return HealthServer(port=0, lifecycle=lifecycle)
+    srv = HealthServer(port=0, lifecycle=lifecycle)
+    bp = create_api_blueprint(lifecycle, 'src/config/config.base.yaml', 'data/raw/companies.jsonl', 'data/raw/events', 'data/manifests/generator_state.json', 'data/manifests/logs')
+    srv.app.register_blueprint(bp, url_prefix='/api')
+    return srv
 
 
 @pytest.fixture()
@@ -60,7 +64,7 @@ def client(server):
 
 def test_logs_level_filter(client, log_setup):
     logs_root, base_now = log_setup
-    resp = client.get("/logs?level=error")
+    resp = client.get("/api/logs?level=error")
     assert resp.status_code == 200
     data = resp.get_json()
     assert all(e["level"] == "error" for e in data["entries"])
@@ -75,7 +79,7 @@ def test_logs_since_filter(client, log_setup):
     since_ts = second_oldest
     from urllib.parse import quote
     encoded_since = quote(since_ts, safe="")
-    resp = client.get(f"/logs?since={encoded_since}")
+    resp = client.get(f"/api/logs?since={encoded_since}")
     assert resp.status_code == 200
     data = resp.get_json()
     # Compare using datetime objects for robustness
@@ -90,7 +94,7 @@ def test_logs_since_filter(client, log_setup):
 
 def test_logs_limit(client, log_setup):
     logs_root, base_now = log_setup
-    resp = client.get("/logs?limit=2")
+    resp = client.get("/api/logs?limit=2")
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["totalReturned"] == 2
@@ -100,7 +104,7 @@ def test_logs_limit(client, log_setup):
 
 def test_logs_invalid_since(client, log_setup):
     logs_root, base_now = log_setup
-    resp = client.get("/logs?since=not-a-date")
+    resp = client.get("/api/logs?since=not-a-date")
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["totalReturned"] >= 1

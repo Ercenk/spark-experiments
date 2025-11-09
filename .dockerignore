@@ -34,6 +34,10 @@ Thumbs.db
 # Data volumes (mounted separately)
 data/
 
+# Node modules (do not copy host installs)
+node_modules/
+frontend/node_modules/
+
 # Logs
 *.log
 logs/

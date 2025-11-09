@@ -18,7 +18,7 @@ export const HealthPanel: React.FC = () => {
   const [data, setData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showInfo } = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -51,6 +51,31 @@ export const HealthPanel: React.FC = () => {
       const r = await resume();
       showSuccess(r.message || 'Resumed');
       load();
+      // Poll for generation restart (batches increasing or auto reinit performed)
+      const start = Date.now();
+      const initial = data; // may be stale but used for comparison
+      const poll = async () => {
+        try {
+          const h: any = await fetchHealth();
+          const cg = h.company_generator?.total_batches ?? 0;
+          const dg = h.driver_generator?.total_batches ?? 0;
+          const cg0 = initial?.company_generator.total_batches ?? cg;
+          const dg0 = initial?.driver_generator.total_batches ?? dg;
+          const autoPerformed = h.auto_reinit?.performed;
+          if (autoPerformed || cg > cg0 || dg > dg0) {
+            showSuccess('Generation activity detected');
+            return;
+          }
+          if (Date.now() - start < 20000) {
+            setTimeout(poll, 1500);
+          } else {
+            showInfo('No new batches yet after resume');
+          }
+        } catch {
+          if (Date.now() - start < 20000) setTimeout(poll, 2000);
+        }
+      };
+      setTimeout(poll, 1500);
     } catch (e) {
       showError((e as Error).message);
     }
@@ -63,7 +88,22 @@ export const HealthPanel: React.FC = () => {
     }
     try {
       const r = await reset();
-      showSuccess(r.message || 'Reset complete');
+      const deleted = (r as any).deleted_count ?? (r as any).filesRemoved;
+      const errors = (r as any).errors as undefined | Array<any>;
+      // Debug log for diagnosis
+      // eslint-disable-next-line no-console
+      console.debug('[reset] raw result', r);
+      const treatAsSuccess = (deleted !== undefined && deleted >= 0) && (r.success === true || r.success === undefined || r.success === null);
+      if (treatAsSuccess) {
+        showSuccess((r.message || 'Reset complete') + (deleted !== undefined ? ` (removed ${deleted})` : ''));
+      } else if (deleted !== undefined && deleted > 0) {
+        const errCount = errors?.length || 0;
+        showInfo(`Reset partial: removed ${deleted}${errCount ? `, ${errCount} errors` : ''}. ${r.message || ''}`.trim());
+      } else if (r.success === false) {
+        showError(r.message || 'Reset reported failure');
+      } else {
+        showError('Unexpected reset response');
+      }
       load();
     } catch (e) {
       showError((e as Error).message);

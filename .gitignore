@@ -41,11 +41,13 @@ Thumbs.db
 logs/
 
 # Node / Frontend
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite-cache/
 *.tsbuildinfo
 *.eslintcache
+coverage/
 
 # Frontend environment
 frontend/.env
