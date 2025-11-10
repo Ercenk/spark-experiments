@@ -58,6 +58,9 @@ data/*
 !data/.gitkeep
 !data/manifests/.gitkeep
 
+# Demo outputs (generated data)
+demo_output/
+
 # Experiment outputs (tracked selectively)
 experiments/*/metrics.jsonl
 experiments/*/output/

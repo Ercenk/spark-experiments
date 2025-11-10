@@ -31,7 +31,14 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+[Gates determined based on constitution file - verify compliance with all seven principles:]
+- **Principle I**: Reproducible Local-First Spark Cluster
+- **Principle II**: Data Realism & Synthetic Fidelity
+- **Principle III**: Iterative Experiment Discipline
+- **Principle IV**: Observability & Metrics
+- **Principle V**: Simplicity & Teardown Hygiene
+- **Principle VI**: Strict Python Type Safety (mypy --strict, full annotations)
+- **Principle VII**: Generated Data Exclusion from Version Control (.gitignore patterns verified)
 
 ## Project Structure
 

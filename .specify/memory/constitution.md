@@ -1,15 +1,15 @@
 <!--
 Sync Impact Report
-Version: 0.1.0 -> 0.2.0 (MINOR: new principle added)
+Version: 0.2.0 -> 0.3.0 (MINOR: new principle added)
 Modified Principles: (none)
-Added Sections: Principle VI - Strict Python Type Safety
+Added Sections: Principle VII - Generated Data Exclusion from Version Control
 Removed Sections: (none)
 Templates Alignment:
-	.specify/templates/plan-template.md ✅ (Constitution Check will reference type safety principle)
+	.specify/templates/plan-template.md ✅ (Constitution Check will reference data exclusion principle)
 	.specify/templates/spec-template.md ✅ (Independent user stories unaffected)
 	.specify/templates/tasks-template.md ✅ (Task grouping by story unchanged)
 Deferred TODOs: None
-Rationale: Adding strict type checking enforcement for Python code quality, maintainability, and early error detection.
+Rationale: Ensuring generated and processed data directories remain outside version control to prevent repository bloat, maintain reproducibility from source, and align with infrastructure-as-code principles. Only schemas, generators, and manifests belong in git.
 -->
 
 # Spark Transportation Ingestion Sandbox Constitution
@@ -77,6 +77,21 @@ justification. Rationale: Type safety prevents entire classes of runtime errors,
 improves IDE support, enables confident refactoring, and serves as executable
 documentation for data generator schemas and Spark transformation pipelines.
 
+### VII. Generated Data Exclusion from Version Control
+Generated data directories (`data/raw/`, `data/staged/`, `data/processed/`,
+`demo_output/`, `experiments/*/output/`, `experiments/*/metrics.jsonl`) and their
+contents MUST be excluded from version control via `.gitignore`. Only empty
+`.gitkeep` marker files in structural parent directories (e.g., `data/.gitkeep`,
+`data/manifests/.gitkeep`) are permitted. Dataset manifests, schemas, generation
+scripts, configuration files, and metadata descriptors MUST be version controlled.
+Committing actual generated data (JSON Lines, Parquet, Delta tables, logs) is
+PROHIBITED. Rationale: Generated data is reproducible from source (seeds +
+configs + generators), version control tracks intent not output, repository size
+must remain manageable, and clean clones must regenerate data locally. Violations
+bloat repository history and break reproducibility guarantees. Exception: Small
+reference fixtures (<10KB) for unit tests MAY be committed under `tests/fixtures/`
+with explicit justification in commit message.
+
 ## Environment & Data Constraints
 
 Docker Compose is the canonical orchestration. Spark image MUST pin exact
@@ -98,7 +113,7 @@ original unmodified copy. All schemas MUST be versioned (`schema-vX.Y.json`).
 
 Pull requests MUST include: experiment id, hypothesis file path, dataset
 manifest reference, expected vs actual metrics table. Reviewers MUST deny if
-**Version**: 0.2.0 | **Ratified**: 2025-11-08 | **Last Amended**: 2025-11-08
+principles violated.
 
 ## Governance
 
@@ -112,4 +127,4 @@ experiment directories contain required hypothesis + results + metrics; Docker
 Compose unchanged except through reviewed PRs. Non-compliance MUST be remediated
 before new experiments begin.
 
-**Version**: 0.1.0 | **Ratified**: 2025-11-08 | **Last Amended**: 2025-11-08
+**Version**: 0.3.0 | **Ratified**: 2025-11-08 | **Last Amended**: 2025-11-09
