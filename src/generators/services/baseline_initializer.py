@@ -77,9 +77,14 @@ class BaselineInitializer:
             try:
                 from src.generators.company_generator import CompanyGenerator
                 gen = CompanyGenerator()
+                # Load config to pass to generate_companies
+                from src.generators.config import Config
+                with open(str(self.config_path), 'r') as f:
+                    config_dict = yaml.safe_load(f)
+                config = Config(**config_dict)
                 seed = gen.get_seed("data/manifests/seed_manifest.json", seed_value)
-                companies = gen.generate_companies(company_count, seed)
-                gen.write_companies_jsonl(companies, str(self.companies_file))
+                companies, corrupted = gen.generate_companies(company_count, seed, config)
+                gen.write_companies_jsonl(companies, corrupted, str(self.companies_file))
                 companies_created = company_count
                 actions.append({"companies": str(company_count)})
             except Exception as e:

@@ -18,4 +18,8 @@ def register_health(bp, health_agg: HealthAggregator, verifier: VerificationServ
             'missing': report.missing,
             'event_file_count': report.event_file_count,
         })
-        return jsonify(snap.__dict__)
+        # Convert to dict and remove None emulated_config for production mode
+        response = snap.__dict__.copy()
+        if response.get('emulated_config') is None:
+            response.pop('emulated_config', None)
+        return jsonify(response)

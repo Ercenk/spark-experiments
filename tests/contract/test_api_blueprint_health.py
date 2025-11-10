@@ -12,7 +12,14 @@ from src.generators.api import create_api_blueprint
 def app(tmp_path: Path):
     lifecycle = GeneratorLifecycle()
     cfg = tmp_path / "config.yaml"
-    cfg.write_text("number_of_companies: 2\nseed: 101\n")
+    cfg.write_text("""
+number_of_companies: 2
+seed: 101
+drivers_per_company: 3
+event_rate_per_driver: 5
+company_onboarding_interval: PT15M
+driver_event_interval: PT15M
+""")
     companies = tmp_path / "companies.jsonl"
     events = tmp_path / "events"
     state_file = tmp_path / "generator_state.json"

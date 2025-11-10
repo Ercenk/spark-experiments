@@ -1,0 +1,24 @@
+# Emulated mode configuration for rapid pipeline testing
+# Generates small batches (5-20 records) at fast intervals (5-10 seconds)
+# to enable near real-time observation of bronze → silver → gold transformations
+
+seed: 42
+number_of_companies: 100        # Production value (unused when emulated)
+drivers_per_company: 10
+event_rate_per_driver: 3.5
+company_onboarding_interval: PT1H   # Production value
+driver_event_interval: PT15M        # Production value
+
+# Quality injection (reused from feature 005)
+quality_injection:
+  enabled: true
+  corruption_rate: 0.3
+
+# Emulated mode overrides
+emulated_mode:
+  enabled: true
+  company_batch_interval: PT10S   # 10-second cadence
+  driver_batch_interval: PT10S
+  companies_per_batch: 10
+  events_per_batch_min: 5
+  events_per_batch_max: 20
