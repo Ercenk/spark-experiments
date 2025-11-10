@@ -10,6 +10,7 @@ from typing import List, Optional
 from src.generators.base import BaseGenerator
 from src.generators.config import Config
 from src.generators.models import Company
+from src.generators.injector import QualityInjector
 
 
 class CompanyGenerator(BaseGenerator):
@@ -20,13 +21,14 @@ class CompanyGenerator(BaseGenerator):
     Supports reproducible generation via seed.
     """
     
-    def generate_companies(self, count: int, seed: int) -> List[Company]:
+    def generate_companies(self, count: int, seed: int, config: Config) -> List[Company]:
         """
         Generate company records.
         
         Args:
             count: Number of companies to generate
             seed: Random seed for reproducibility (affects UUID generation indirectly via created_at variance)
+            config: Configuration including quality injection settings
             
         Returns:
             List of Company instances
@@ -36,7 +38,11 @@ class CompanyGenerator(BaseGenerator):
             timestamp jitter and ordering for reproducibility.
         """
         import random
+        import numpy as np
+        
         random.seed(seed)
+        rng = np.random.RandomState(seed)
+        injector = QualityInjector(config.quality_injection, rng)
         
         companies = []
         base_time = datetime.now(timezone.utc)
@@ -47,7 +53,31 @@ class CompanyGenerator(BaseGenerator):
             created_at = base_time.replace(microsecond=jitter_ms * 1000)
             
             company = Company(created_at=created_at)
-            companies.append(company)
+            
+            # Inject quality issues if configured
+            company_dict = company.model_dump(mode='json')
+            corrupted_dict = injector.inject_into_company(company_dict)
+            
+            # Try to reconstruct - if injection removed required fields, may fail
+            try:
+                final_company = Company(**corrupted_dict)
+                companies.append(final_company)
+            except Exception:
+                # Invalid company - skip for now (in production, write malformed JSON)
+                if self.logger:
+                    self.logger.debug(f"Quality injection created invalid company: {corrupted_dict}")
+        
+        # Log quality injection summary
+        if injector.config.enabled and self.logger:
+            summary = injector.get_issues_summary()
+            self.logger.info(
+                f"Quality injection summary for companies",
+                metadata={
+                    "total_companies": len(companies),
+                    "issues_injected": sum(summary.values()),
+                    "issue_breakdown": summary
+                }
+            )
         
         return companies
     
@@ -192,7 +222,7 @@ To reproduce this dataset exactly:
         )
         
         # Generate
-        companies = self.generate_companies(count, seed)
+        companies = self.generate_companies(count, seed, config)
         
         # Write
         written_count = self.write_companies_jsonl(companies, output_path)

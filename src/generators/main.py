@@ -115,7 +115,7 @@ def run_company_generator_continuous(
                 "Initial startup detected - generating first company batch",
                 metadata={"output_path": output_path, "count": config.number_of_companies}
             )
-        companies = generator.generate_companies(config.number_of_companies, seed + batch_counter)
+        companies = generator.generate_companies(config.number_of_companies, seed + batch_counter, config)
         written_count = generator.write_companies_jsonl(companies, output_path)
         batch_counter += 1
         state.save(lifecycle, {"last_company_batch": batch_counter, "last_company_time": datetime.now(timezone.utc).isoformat()})
@@ -132,7 +132,7 @@ def run_company_generator_continuous(
         
         # Generate companies
         batch_start_time = datetime.now(timezone.utc)
-        companies = generator.generate_companies(config.number_of_companies, seed + batch_counter)
+        companies = generator.generate_companies(config.number_of_companies, seed + batch_counter, config)
         written_count = generator.write_companies_jsonl(companies, output_path)
         batch_duration = (datetime.now(timezone.utc) - batch_start_time).total_seconds()
         

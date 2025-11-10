@@ -1,0 +1,28 @@
+# Configuration for data quality injection testing
+# Enables injection of realistic data quality issues at 15% error rate
+
+number_of_companies: 10
+drivers_per_company: 5
+event_rate_per_driver: 3.5
+company_onboarding_interval: PT30M
+seed: 42
+
+# Quality injection configuration
+quality_injection:
+  enabled: true
+  error_rate: 0.15  # 15% of records will have at least one quality issue
+  
+  # Issue type probabilities (applied when a record is selected for errors)
+  missing_field_probability: 0.3
+  null_value_probability: 0.3
+  malformed_timestamp_probability: 0.2
+  invalid_enum_probability: 0.1
+  duplicate_probability: 0.05
+  boundary_violation_probability: 0.05
+  
+  # Scope
+  inject_in_driver_events: true
+  inject_in_companies: true
+  
+  # Logging
+  log_injected_issues: true

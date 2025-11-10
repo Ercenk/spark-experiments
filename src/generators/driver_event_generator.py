@@ -15,6 +15,7 @@ from src.generators.base import BaseGenerator
 from src.generators.config import Config
 from src.generators.coordination import get_onboarded_companies_before
 from src.generators.models import DriverEventBatch, DriverEventRecord, BatchManifest
+from src.generators.injector import QualityInjector
 
 
 class DriverEventGenerator(BaseGenerator):
@@ -76,6 +77,7 @@ class DriverEventGenerator(BaseGenerator):
             List of DriverEventRecord instances with timestamps in [interval_start, interval_end)
         """
         rng = np.random.RandomState(seed)
+        injector = QualityInjector(config.quality_injection, rng)
         events = []
         
         # Event type weights (Option B: Weighted Static)
@@ -111,7 +113,33 @@ class DriverEventGenerator(BaseGenerator):
                         event_type=event_type,
                         timestamp=timestamp
                     )
-                    events.append(event)
+                    
+                    # Inject quality issues if configured
+                    event_dict = event.model_dump(mode='json')
+                    corrupted_dict = injector.inject_into_driver_event(event_dict, driver_id)
+                    
+                    # Try to reconstruct - if injection removed required fields, this may fail
+                    try:
+                        final_event = DriverEventRecord(**corrupted_dict)
+                        events.append(final_event)
+                    except Exception:
+                        # Injected issue made record invalid - skip for now
+                        # In production, we'd write malformed JSON directly
+                        if self.logger:
+                            self.logger.debug(f"Quality injection created invalid record: {corrupted_dict}")
+        
+        # Log quality injection summary
+        if injector.config.enabled and self.logger:
+            summary = injector.get_issues_summary()
+            self.logger.info(
+                f"Quality injection summary",
+                metadata={
+                    "interval_start": interval_start.isoformat(),
+                    "total_events": len(events),
+                    "issues_injected": sum(summary.values()),
+                    "issue_breakdown": summary
+                }
+            )
         
         return events
     
