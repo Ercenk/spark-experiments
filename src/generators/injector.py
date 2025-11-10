@@ -96,14 +96,15 @@ class QualityInjector:
         record_id = f"company_{company.get('company_id', 'unknown')}"
         
         # Randomly choose which issue type(s) to inject
+        # Company fields: company_id, geography, active, created_at
         if self.rng.random() < self.config.missing_field_probability:
-            corrupted = self._inject_missing_field(corrupted, record_id, ["company_name", "company_id"])
+            corrupted = self._inject_missing_field(corrupted, record_id, ["geography", "active", "company_id"])
         
         if self.rng.random() < self.config.null_value_probability:
-            corrupted = self._inject_null_value(corrupted, record_id, ["company_name", "company_id", "onboarded_at"])
+            corrupted = self._inject_null_value(corrupted, record_id, ["geography", "active", "company_id", "created_at"])
         
         if self.rng.random() < self.config.malformed_timestamp_probability:
-            corrupted = self._inject_malformed_timestamp(corrupted, record_id, "onboarded_at")
+            corrupted = self._inject_malformed_timestamp(corrupted, record_id, "created_at")
         
         return corrupted
     
