@@ -29,7 +29,7 @@ def create_api_blueprint(
     lifecycle_service = LifecycleCommandService(lifecycle)
     baseline = BaselineInitializer(config_path, companies_file, events_dir)
     verifier = VerificationService(companies_file, events_dir)
-    health_agg = HealthAggregator(lifecycle, state_file)
+    health_agg = HealthAggregator(lifecycle, state_file, config_path)
     log_reader = LogReaderService(logs_root)
 
     register_health(bp, health_agg, verifier)

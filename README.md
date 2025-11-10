@@ -20,6 +20,63 @@ Features:
 - Docker & Docker Compose
 - Python 3.11+ (for local development/testing)
 
+### Emulated Mode (Fast-Cadence Development)
+
+**New Feature**: Emulated mode enables rapid pipeline testing by generating small batches (5-20 records) at fast intervals (5-10 seconds) instead of production-scale batches at hourly/15-minute intervals.
+
+**Use Cases**:
+- Testing bronze → silver → gold transformations without waiting 15+ minutes between batches
+- Debugging quality injection logic with visible results in seconds
+- Demonstrating pipeline flow to stakeholders
+- Validating dashboard real-time updates
+
+**Quick Start**:
+
+```powershell
+# 1. Use emulated configuration
+cd docker
+# Edit docker-compose.yml to mount emulated config:
+# - ./src/config/config.emulated.yaml:/app/src/config/config.active.yaml
+
+# Or copy manually after container start:
+docker compose exec generator cp /app/src/config/config.emulated.yaml /app/src/config/config.active.yaml
+
+# 2. Start generator
+docker compose restart generator
+
+# 3. Observe batches every 10 seconds
+docker compose logs -f generator
+
+# 4. Check emulated mode in health endpoint
+curl.exe http://localhost:18000/api/health | jq '{mode:.generation_mode, config:.emulated_config}'
+
+# Output:
+# {
+#   "mode": "emulated",
+#   "config": {
+#     "company_interval_seconds": 10,
+#     "driver_interval_seconds": 10,
+#     "companies_per_batch": 10,
+#     "events_per_batch_range": [5, 20]
+#   }
+# }
+```
+
+**Emulated Configuration Presets**:
+
+| Config | Interval | Batch Size | Use Case |
+|--------|----------|------------|----------|
+| `config.emulated.5s.yaml` | 5 seconds | 3-10 events | Ultra-fast iteration |
+| `config.emulated.yaml` | 10 seconds | 5-20 events | Standard development |
+| `config.emulated.30s.yaml` | 30 seconds | 10-50 events | Moderate cadence with larger batches |
+
+**Performance Expectations** (1-hour emulated run at 10s intervals):
+- Batches generated: ~720 (360 company + 360 driver)
+- Disk space: ~200 MB (mostly batch metadata)
+- Memory usage: ~35 MB (batches flushed to disk)
+
+See [Emulated Mode Quickstart](specs/006-emulated-generation/quickstart.md) for detailed usage and troubleshooting.
+
 ### 1. Launch Environment (Continuous Mode)
 
 ```powershell

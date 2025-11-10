@@ -1,0 +1,23 @@
+# Moderate emulated mode configuration (30-second intervals)
+# For balanced observation with larger batches
+
+seed: 42
+number_of_companies: 100        # Production value (unused when emulated)
+drivers_per_company: 10
+event_rate_per_driver: 3.5
+company_onboarding_interval: PT1H   # Production value
+driver_event_interval: PT15M        # Production value
+
+# Quality injection (reused from feature 005)
+quality_injection:
+  enabled: true
+  corruption_rate: 0.3
+
+# Moderate emulated mode overrides
+emulated_mode:
+  enabled: true
+  company_batch_interval: PT30S   # 30-second cadence (moderate)
+  driver_batch_interval: PT30S
+  companies_per_batch: 20         # Larger batches
+  events_per_batch_min: 10
+  events_per_batch_max: 50

@@ -99,8 +99,20 @@ def run_company_generator_continuous(
         config_data = yaml.safe_load(f)
     config = Config(**config_data)
     
-    # Parse company_onboarding_interval
-    interval_duration = isodate.parse_duration(config.company_onboarding_interval)
+    # Log generation mode at startup
+    mode_str = "emulated" if config.emulated_mode.enabled else "production"
+    if logger:
+        logger.info(
+            f"Starting company generator in {mode_str} mode",
+            metadata={
+                "mode": mode_str,
+                "interval": config.active_company_interval,
+                "batch_size": config.active_company_count
+            }
+        )
+    
+    # Parse active company interval (uses emulated or production based on config)
+    interval_duration = isodate.parse_duration(config.active_company_interval)
     if not isinstance(interval_duration, timedelta):
         interval_duration = timedelta(hours=1)  # Default fallback
     
@@ -113,9 +125,9 @@ def run_company_generator_continuous(
         if logger:
             logger.info(
                 "Initial startup detected - generating first company batch",
-                metadata={"output_path": output_path, "count": config.number_of_companies}
+                metadata={"output_path": output_path, "count": config.active_company_count}
             )
-        companies = generator.generate_companies(config.number_of_companies, seed + batch_counter, config)
+        companies = generator.generate_companies(config.active_company_count, seed + batch_counter, config)
         written_count = generator.write_companies_jsonl(companies, output_path)
         batch_counter += 1
         state.save(lifecycle, {"last_company_batch": batch_counter, "last_company_time": datetime.now(timezone.utc).isoformat()})
@@ -132,16 +144,19 @@ def run_company_generator_continuous(
         
         # Generate companies
         batch_start_time = datetime.now(timezone.utc)
-        companies, corrupted_companies = generator.generate_companies(config.number_of_companies, seed + batch_counter, config)
+        companies, corrupted_companies = generator.generate_companies(config.active_company_count, seed + batch_counter, config)
         written_count = generator.write_companies_jsonl(companies, corrupted_companies, output_path)
         batch_duration = (datetime.now(timezone.utc) - batch_start_time).total_seconds()
         
+        mode_str = "emulated" if config.emulated_mode.enabled else "production"
         if logger:
             logger.info(
-                f"Company batch {batch_counter} generated: {written_count} companies written",
+                f"Company batch {batch_counter} generated ({mode_str} mode): {written_count} companies written",
                 metadata={
                     "batch_counter": batch_counter,
+                    "mode": mode_str,
                     "generated_count": len(companies),
+                    "corrupted_count": len(corrupted_companies),
                     "written_count": written_count,
                     "discarded_count": len(companies) - written_count,
                     "batch_duration_seconds": round(batch_duration, 3),
@@ -166,7 +181,7 @@ def run_company_generator_continuous(
                     "completed_batches": batch_counter
                 }
             )
-        if not GeneratorOrchestrator.wait_for_next_interval(next_time, lifecycle):
+        if not GeneratorOrchestrator.wait_for_next_interval(next_time, lifecycle, emulated_mode=config.emulated_mode.enabled):
             if logger:
                 logger.info("Company generator shutdown requested")
             break
@@ -193,17 +208,8 @@ def run_driver_generator_continuous(
     """
     from src.generators.driver_event_generator import DriverEventGenerator
     from src.generators.orchestrator import GeneratorOrchestrator
-    
-    if logger:
-        logger.info(
-            "Starting driver event generator in continuous mode",
-            metadata={
-                "config_path": config_path,
-                "output_dir": output_dir,
-                "companies_file": companies_file,
-                "interval_minutes": 15
-            }
-        )
+    import isodate
+    from datetime import timedelta
     
     generator = DriverEventGenerator()
     generator.logger = logger
@@ -211,7 +217,28 @@ def run_driver_generator_continuous(
     config = generator.load_config(config_path)
     seed = generator.get_seed("data/manifests/seed_manifest.json", config.seed)
     
-    interval_minutes = 15
+    # Log generation mode at startup
+    mode_str = "emulated" if config.emulated_mode.enabled else "production"
+    
+    # Parse active driver interval (uses emulated or production based on config)
+    interval_duration = isodate.parse_duration(config.active_driver_interval)
+    if not isinstance(interval_duration, timedelta):
+        interval_duration = timedelta(minutes=15)  # Default fallback
+    interval_seconds = interval_duration.total_seconds()
+    
+    if logger:
+        logger.info(
+            f"Starting driver event generator in {mode_str} mode",
+            metadata={
+                "mode": mode_str,
+                "config_path": config_path,
+                "output_dir": output_dir,
+                "companies_file": companies_file,
+                "interval": config.active_driver_interval,
+                "interval_seconds": interval_seconds
+            }
+        )
+    
     batch_counter = 0
     
     # Check if this is initial startup (no batches exist)
@@ -227,7 +254,8 @@ def run_driver_generator_continuous(
         # Generate batch for current/most recent interval immediately
         # For initial startup, use current time as cutoff so newly created companies are included
         now = datetime.now(timezone.utc)
-        interval_start, interval_end = generator.compute_interval_bounds(now, interval_minutes)
+        interval_start = GeneratorOrchestrator.align_to_interval(now, interval_seconds)
+        interval_end = interval_start + interval_duration
         
         batch_seed = seed + batch_counter
         batch_start_time = datetime.now(timezone.utc)
@@ -235,6 +263,11 @@ def run_driver_generator_continuous(
         # Get eligible companies (use 'now' instead of interval_start for initial batch)
         from src.generators.coordination import get_onboarded_companies_before as coord_get_companies
         eligible_companies = coord_get_companies(now, companies_file)
+        
+        # Apply emulated mode batch size limits if enabled
+        if config.emulated_mode.enabled:
+            max_companies = config.emulated_mode.companies_per_batch
+            eligible_companies = eligible_companies[:max_companies]
         
         if logger:
             logger.info(
@@ -247,14 +280,31 @@ def run_driver_generator_continuous(
                 }
             )
         
+        # Adjust event rate for emulated mode if needed
+        effective_config = config
+        if config.emulated_mode.enabled and len(eligible_companies) > 0:
+            # Scale event_rate_per_driver to hit target event range
+            target_events = (config.emulated_mode.events_per_batch_min + 
+                             config.emulated_mode.events_per_batch_max) / 2
+            expected_drivers = len(eligible_companies) * config.drivers_per_company
+            if expected_drivers > 0:
+                adjusted_rate = target_events / expected_drivers
+                # Create temporary config with adjusted rate
+                effective_config = config.model_copy(deep=True)
+                effective_config.event_rate_per_driver = max(0.1, adjusted_rate)
+        
         # Generate events using the eligible companies
         events = generator.generate_driver_events(
             eligible_companies,
-            config,
+            effective_config,
             interval_start,
             interval_end,
             batch_seed
         )
+        
+        # Truncate if exceeded max in emulated mode
+        if config.emulated_mode.enabled and len(events) > config.emulated_mode.events_per_batch_max:
+            events = events[:config.emulated_mode.events_per_batch_max]
         
         # Create batch metadata
         batch_id = interval_start.strftime("%Y%m%dT%H%M%SZ")
@@ -278,9 +328,10 @@ def run_driver_generator_continuous(
         
         if logger:
             logger.info(
-                f"Initial driver batch generated: {batch_meta.event_count} events",
+                f"Initial driver batch generated ({mode_str} mode): {batch_meta.event_count} events",
                 metadata={
                     "batch_counter": batch_counter,
+                    "mode": mode_str,
                     "batch_id": batch_meta.batch_id,
                     "event_count": batch_meta.event_count,
                     "interval_start": interval_start.isoformat(),
@@ -305,9 +356,10 @@ def run_driver_generator_continuous(
         if not lifecycle.wait_if_paused():
             break
         
-        # Compute interval
+        # Compute interval using align_to_interval for second-level precision
         now = datetime.now(timezone.utc)
-        interval_start, interval_end = generator.compute_interval_bounds(now, interval_minutes)
+        interval_start = GeneratorOrchestrator.align_to_interval(now, interval_seconds)
+        interval_end = interval_start + interval_duration
         
         # Wait until interval end if we're in the middle of an interval
         if now < interval_end:
@@ -322,7 +374,7 @@ def run_driver_generator_continuous(
                         "completed_batches": batch_counter
                     }
                 )
-            if not GeneratorOrchestrator.wait_for_next_interval(interval_end, lifecycle):
+            if not GeneratorOrchestrator.wait_for_next_interval(interval_end, lifecycle, emulated_mode=config.emulated_mode.enabled):
                 if logger:
                     logger.info("Driver generator shutdown requested")
                 break
@@ -332,24 +384,70 @@ def run_driver_generator_continuous(
         batch_seed = seed + batch_counter
         batch_start_time = datetime.now(timezone.utc)
         
-        batch_meta = generator.generate_single_batch(
-            config,
-            output_dir,
-            companies_file,
-            batch_seed,
+        # Get eligible companies
+        from src.generators.coordination import get_onboarded_companies_before as coord_get_companies
+        eligible_companies = coord_get_companies(interval_start, companies_file)
+        
+        # Apply emulated mode batch size limits if enabled
+        if config.emulated_mode.enabled:
+            max_companies = config.emulated_mode.companies_per_batch
+            eligible_companies = eligible_companies[:max_companies]
+        
+        # Adjust event rate for emulated mode if needed
+        effective_config = config
+        if config.emulated_mode.enabled and len(eligible_companies) > 0:
+            # Scale event_rate_per_driver to hit target event range
+            target_events = (config.emulated_mode.events_per_batch_min + 
+                             config.emulated_mode.events_per_batch_max) / 2
+            expected_drivers = len(eligible_companies) * config.drivers_per_company
+            if expected_drivers > 0:
+                adjusted_rate = target_events / expected_drivers
+                # Create temporary config with adjusted rate
+                effective_config = config.model_copy(deep=True)
+                effective_config.event_rate_per_driver = max(0.1, adjusted_rate)
+        
+        # Generate events
+        events = generator.generate_driver_events(
+            eligible_companies,
+            effective_config,
             interval_start,
-            interval_end
+            interval_end,
+            batch_seed
         )
+        
+        # Truncate if exceeded max in emulated mode
+        if config.emulated_mode.enabled and len(events) > config.emulated_mode.events_per_batch_max:
+            events = events[:config.emulated_mode.events_per_batch_max]
+        
+        # Create batch metadata
+        batch_id = interval_start.strftime("%Y%m%dT%H%M%SZ")
+        from src.generators.models import DriverEventBatch
+        batch_meta = DriverEventBatch(
+            batch_id=batch_id,
+            interval_start=interval_start,
+            interval_end=interval_end,
+            event_count=len(events),
+            seed=batch_seed
+        )
+        
+        # Write batch
+        generator.write_batch(events, batch_meta, output_dir)
+        
+        # Update manifest
+        manifest_path = "data/manifests/batch_manifest.json"
+        generator.update_manifest(manifest_path, batch_meta)
         
         batch_duration = (datetime.now(timezone.utc) - batch_start_time).total_seconds()
         
         if logger:
             logger.info(
-                f"Driver batch {batch_counter} generated: {batch_meta.event_count} events for interval [{interval_start.strftime('%H:%M')}-{interval_end.strftime('%H:%M')}]",
+                f"Driver batch {batch_counter} generated ({mode_str} mode): {batch_meta.event_count} events for interval [{interval_start.strftime('%H:%M:%S')}-{interval_end.strftime('%H:%M:%S')}]",
                 metadata={
                     "batch_counter": batch_counter,
+                    "mode": mode_str,
                     "batch_id": batch_meta.batch_id,
                     "event_count": batch_meta.event_count,
+                    "eligible_companies": len(eligible_companies) if not config.emulated_mode.enabled else config.emulated_mode.companies_per_batch,
                     "interval_start": interval_start.isoformat(),
                     "interval_end": interval_end.isoformat(),
                     "batch_duration_seconds": round(batch_duration, 3),
