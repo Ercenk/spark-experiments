@@ -132,8 +132,8 @@ def run_company_generator_continuous(
         
         # Generate companies
         batch_start_time = datetime.now(timezone.utc)
-        companies = generator.generate_companies(config.number_of_companies, seed + batch_counter, config)
-        written_count = generator.write_companies_jsonl(companies, output_path)
+        companies, corrupted_companies = generator.generate_companies(config.number_of_companies, seed + batch_counter, config)
+        written_count = generator.write_companies_jsonl(companies, corrupted_companies, output_path)
         batch_duration = (datetime.now(timezone.utc) - batch_start_time).total_seconds()
         
         if logger:

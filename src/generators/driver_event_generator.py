@@ -62,7 +62,7 @@ class DriverEventGenerator(BaseGenerator):
         interval_start: datetime,
         interval_end: datetime,
         seed: int
-    ) -> List[DriverEventRecord]:
+    ) -> Tuple[List[DriverEventRecord], List[dict]]:
         """
         Generate driver events for companies using Poisson inter-arrival and weighted sampling.
         
@@ -74,11 +74,14 @@ class DriverEventGenerator(BaseGenerator):
             seed: Random seed for reproducibility
             
         Returns:
-            List of DriverEventRecord instances with timestamps in [interval_start, interval_end)
+            Tuple of (valid_events, corrupted_dicts) where:
+            - valid_events: List of DriverEventRecord instances that are schema-valid
+            - corrupted_dicts: List of dict objects with quality issues that violate schema
         """
         rng = np.random.RandomState(seed)
         injector = QualityInjector(config.quality_injection, rng)
         events = []
+        corrupted_events = []
         
         # Event type weights (Option B: Weighted Static)
         event_types = ["start driving", "stopped driving", "delivered"]
@@ -123,8 +126,8 @@ class DriverEventGenerator(BaseGenerator):
                         final_event = DriverEventRecord(**corrupted_dict)
                         events.append(final_event)
                     except Exception:
-                        # Injected issue made record invalid - skip for now
-                        # In production, we'd write malformed JSON directly
+                        # Quality injection made record invalid - write as corrupted dict
+                        corrupted_events.append(corrupted_dict)
                         if self.logger:
                             self.logger.debug(f"Quality injection created invalid record: {corrupted_dict}")
         
@@ -135,36 +138,49 @@ class DriverEventGenerator(BaseGenerator):
                 f"Quality injection summary",
                 metadata={
                     "interval_start": interval_start.isoformat(),
-                    "total_events": len(events),
+                    "total_valid_events": len(events),
+                    "total_corrupted_events": len(corrupted_events),
+                    "total_events": len(events) + len(corrupted_events),
                     "issues_injected": sum(summary.values()),
                     "issue_breakdown": summary
                 }
             )
         
-        return events
+        return events, corrupted_events
     
     def write_batch(
         self,
         events: List[DriverEventRecord],
+        corrupted_events: List[dict],
         batch_meta: DriverEventBatch,
         output_dir: str
     ) -> None:
         """
         Write batch to disk: events.jsonl and batch_meta.json in batch_id subdirectory.
         
+        Writes both valid events (as DriverEventRecord) and corrupted events (as raw dicts)
+        to the same JSONL file. This simulates real-world scenarios where bronze data
+        contains both valid and malformed records.
+        
         Args:
-            events: List of DriverEventRecord instances
+            events: List of valid DriverEventRecord instances
+            corrupted_events: List of corrupted dict objects (invalid schema)
             batch_meta: DriverEventBatch metadata
             output_dir: Base output directory for batches
         """
         batch_dir = Path(output_dir) / batch_meta.batch_id
         batch_dir.mkdir(parents=True, exist_ok=True)
         
-        # Write events
+        # Write all events (valid + corrupted) to same file
         events_file = batch_dir / "events.jsonl"
         with open(events_file, 'w') as f:
+            # Write valid events
             for event in events:
                 f.write(event.model_dump_json() + '\n')
+            
+            # Write corrupted events as raw JSON
+            for corrupted_dict in corrupted_events:
+                f.write(json.dumps(corrupted_dict) + '\n')
         
         # Write batch metadata
         meta_file = batch_dir / "batch_meta.json"
@@ -176,32 +192,37 @@ class DriverEventGenerator(BaseGenerator):
                 f"Wrote batch {batch_meta.batch_id}",
                 metadata={
                     "batch_id": batch_meta.batch_id,
-                    "event_count": len(events),
+                    "valid_event_count": len(events),
+                    "corrupted_event_count": len(corrupted_events),
+                    "total_event_count": len(events) + len(corrupted_events),
                     "batch_dir": str(batch_dir)
                 }
             )
     
-    def update_manifest(self, manifest_path: str, batch_meta: DriverEventBatch) -> None:
+    def update_manifest(self, manifest_path: str, batch_meta: DriverEventBatch, corrupted_count: int = 0) -> None:
         """
         Update cumulative batch manifest.
         
         Args:
             manifest_path: Path to batch_manifest.json
             batch_meta: Metadata for new batch
+            corrupted_count: Number of corrupted records in this batch
         """
         manifest_file = Path(manifest_path)
         manifest_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        total_in_batch = batch_meta.event_count + corrupted_count
         
         # Load existing manifest if present
         if manifest_file.exists():
             with open(manifest_file, 'r') as f:
                 data = json.load(f)
                 manifest = BatchManifest(**data)
-            manifest.total_events += batch_meta.event_count
+            manifest.total_events += total_in_batch
         else:
             manifest = BatchManifest(
                 last_batch_id=batch_meta.batch_id,
-                total_events=batch_meta.event_count,
+                total_events=total_in_batch,
                 last_updated=datetime.now(timezone.utc)
             )
         
@@ -249,8 +270,8 @@ class DriverEventGenerator(BaseGenerator):
                 }
             )
         
-        # Generate events
-        events = self.generate_driver_events(
+        # Generate events (returns valid + corrupted)
+        events, corrupted_events = self.generate_driver_events(
             eligible_companies,
             config,
             interval_start,
@@ -258,7 +279,7 @@ class DriverEventGenerator(BaseGenerator):
             seed
         )
         
-        # Create batch metadata
+        # Create batch metadata (only counts valid events in metadata)
         batch_id = interval_start.strftime("%Y%m%dT%H%M%SZ")
         batch_meta = DriverEventBatch(
             batch_id=batch_id,
@@ -268,19 +289,21 @@ class DriverEventGenerator(BaseGenerator):
             seed=seed
         )
         
-        # Write batch
-        self.write_batch(events, batch_meta, output_dir)
+        # Write batch (both valid and corrupted to same file)
+        self.write_batch(events, corrupted_events, batch_meta, output_dir)
         
         # Update manifest
         manifest_path = "data/manifests/batch_manifest.json"
-        self.update_manifest(manifest_path, batch_meta)
+        self.update_manifest(manifest_path, batch_meta, len(corrupted_events))
         
         if self.logger:
             self.logger.info(
                 f"Batch {batch_id} complete",
                 metadata={
                     "batch_id": batch_id,
-                    "event_count": len(events),
+                    "valid_event_count": len(events),
+                    "corrupted_event_count": len(corrupted_events),
+                    "total_event_count": len(events) + len(corrupted_events),
                     "eligible_companies": len(eligible_companies)
                 }
             )
