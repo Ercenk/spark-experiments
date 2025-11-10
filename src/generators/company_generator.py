@@ -5,11 +5,12 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from src.generators.base import BaseGenerator
 from src.generators.config import Config
 from src.generators.models import Company
+from src.generators.injector import QualityInjector
 
 
 class CompanyGenerator(BaseGenerator):
@@ -20,25 +21,33 @@ class CompanyGenerator(BaseGenerator):
     Supports reproducible generation via seed.
     """
     
-    def generate_companies(self, count: int, seed: int) -> List[Company]:
+    def generate_companies(self, count: int, seed: int, config: Config) -> Tuple[List[Company], List[dict]]:
         """
         Generate company records.
         
         Args:
             count: Number of companies to generate
             seed: Random seed for reproducibility (affects UUID generation indirectly via created_at variance)
+            config: Configuration including quality injection settings
             
         Returns:
-            List of Company instances
+            Tuple of (valid_companies, corrupted_dicts) where:
+            - valid_companies: List of Company instances that are schema-valid
+            - corrupted_dicts: List of dict objects with quality issues that violate schema
             
         Note:
             Each company gets a unique UUID. The seed primarily affects
             timestamp jitter and ordering for reproducibility.
         """
         import random
+        import numpy as np
+        
         random.seed(seed)
+        rng = np.random.RandomState(seed)
+        injector = QualityInjector(config.quality_injection, rng)
         
         companies = []
+        corrupted_companies = []
         base_time = datetime.now(timezone.utc)
         
         for i in range(count):
@@ -47,20 +56,51 @@ class CompanyGenerator(BaseGenerator):
             created_at = base_time.replace(microsecond=jitter_ms * 1000)
             
             company = Company(created_at=created_at)
-            companies.append(company)
+            
+            # Inject quality issues if configured
+            company_dict = company.model_dump(mode='json')
+            corrupted_dict = injector.inject_into_company(company_dict)
+            
+            # Try to reconstruct - if injection removed required fields, may fail
+            try:
+                final_company = Company(**corrupted_dict)
+                companies.append(final_company)
+            except Exception:
+                # Invalid company - write as corrupted dict
+                corrupted_companies.append(corrupted_dict)
+                if self.logger:
+                    self.logger.debug(f"Quality injection created invalid company: {corrupted_dict}")
         
-        return companies
+        # Log quality injection summary
+        if injector.config.enabled and self.logger:
+            summary = injector.get_issues_summary()
+            self.logger.info(
+                f"Quality injection summary for companies",
+                metadata={
+                    "total_valid_companies": len(companies),
+                    "total_corrupted_companies": len(corrupted_companies),
+                    "total_companies": len(companies) + len(corrupted_companies),
+                    "issues_injected": sum(summary.values()),
+                    "issue_breakdown": summary
+                }
+            )
+        
+        return companies, corrupted_companies
     
-    def write_companies_jsonl(self, companies: List[Company], output_path: str) -> int:
+    def write_companies_jsonl(self, companies: List[Company], corrupted_companies: List[dict], output_path: str) -> int:
         """
         Write companies to JSON Lines file (append-only, reject duplicates).
         
+        Writes both valid companies and corrupted company dicts to the same file.
+        This simulates real-world scenarios where bronze data contains both valid and malformed records.
+        
         Args:
-            companies: List of Company instances to write
+            companies: List of valid Company instances to write
+            corrupted_companies: List of corrupted company dicts (invalid schema)
             output_path: Path to output companies.jsonl file
             
         Returns:
-            Number of companies successfully written (excludes duplicates)
+            Number of records successfully written (valid + corrupted, excludes duplicates)
         """
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -78,11 +118,12 @@ class CompanyGenerator(BaseGenerator):
                         except json.JSONDecodeError:
                             continue
         
-        # Write new companies, skip duplicates
+        # Write new companies (valid + corrupted), skip duplicates
         written_count = 0
         discarded_count = 0
         
         with open(output_file, 'a') as f:
+            # Write valid companies
             for company in companies:
                 if company.company_id in existing_ids:
                     discarded_count += 1
@@ -96,14 +137,32 @@ class CompanyGenerator(BaseGenerator):
                 f.write(company.model_dump_json() + '\n')
                 existing_ids.add(company.company_id)
                 written_count += 1
+            
+            # Write corrupted companies as raw JSON
+            for corrupted_dict in corrupted_companies:
+                company_id = corrupted_dict.get('company_id')
+                if company_id and company_id in existing_ids:
+                    discarded_count += 1
+                    if self.logger:
+                        self.logger.warn(
+                            f"Duplicate company_id in corrupted record discarded: {company_id}",
+                            metadata={"company_id": company_id}
+                        )
+                    continue
+                
+                f.write(json.dumps(corrupted_dict) + '\n')
+                if company_id:
+                    existing_ids.add(company_id)
+                written_count += 1
         
         if self.logger:
             self.logger.info(
-                f"Wrote {written_count} companies, discarded {discarded_count} duplicates",
+                f"Wrote companies to {output_path}",
                 metadata={
-                    "written": written_count,
-                    "discarded": discarded_count,
-                    "output_path": output_path
+                    "written_count": written_count,
+                    "discarded_duplicates": discarded_count,
+                    "valid_companies": len(companies),
+                    "corrupted_companies": len(corrupted_companies)
                 }
             )
         
@@ -192,10 +251,10 @@ To reproduce this dataset exactly:
         )
         
         # Generate
-        companies = self.generate_companies(count, seed)
+        companies, corrupted_companies = self.generate_companies(count, seed, config)
         
         # Write
-        written_count = self.write_companies_jsonl(companies, output_path)
+        written_count = self.write_companies_jsonl(companies, corrupted_companies, output_path)
         
         # Write dataset descriptor (once)
         descriptor_path = "data/manifests/dataset.md"

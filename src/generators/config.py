@@ -3,6 +3,7 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 import re
+from .quality_injection import QualityInjectionConfig
 
 
 class Config(BaseModel):
@@ -15,6 +16,7 @@ class Config(BaseModel):
     - event_rate_per_driver: Must be > 0
     - company_onboarding_interval: Must be valid ISO8601 duration (e.g., PT1H, PT30M)
     - seed: Optional random seed
+    - quality_injection: Data quality issue injection configuration
     """
     
     number_of_companies: int = Field(gt=0, description="Number of companies to generate")
@@ -22,6 +24,10 @@ class Config(BaseModel):
     event_rate_per_driver: float = Field(gt=0, description="Average events per driver per 15-min interval")
     company_onboarding_interval: str = Field(description="ISO8601 duration for company onboarding cadence (e.g., PT1H)")
     seed: Optional[int] = Field(default=None, description="Random seed for reproducibility")
+    quality_injection: QualityInjectionConfig = Field(
+        default_factory=QualityInjectionConfig,
+        description="Data quality injection configuration for testing"
+    )
     
     @field_validator('company_onboarding_interval')
     @classmethod
