@@ -129,7 +129,17 @@ class DriverEventGenerator(BaseGenerator):
                         # Quality injection made record invalid - write as corrupted dict
                         corrupted_events.append(corrupted_dict)
                         if self.logger:
-                            self.logger.debug(f"Quality injection created invalid record: {corrupted_dict}")
+                            self.logger.info(f"Quality injection created invalid record: {corrupted_dict}")
+        
+        # Inject duplicate events if configured
+        if injector.config.enabled and len(events) > 0:
+            duplicate_count = int(len(events) * injector.config.duplicate_probability)
+            for _ in range(duplicate_count):
+                # Pick a random event to duplicate
+                duplicate_event = rng.choice(events)
+                events.append(duplicate_event)
+                if self.logger:
+                    self.logger.info(f"Injected duplicate event: {duplicate_event.event_id}")
         
         # Log quality injection summary
         if injector.config.enabled and self.logger:

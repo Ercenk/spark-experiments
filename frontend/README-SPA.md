@@ -71,6 +71,22 @@ Response shape (includes pagination pointer):
 - Control actions (pause/resume/reset) optimistically refresh health state.
 - Layout: The `LogsPanel` now flex-grows to occupy remaining vertical space in the viewport (`.app-container` uses a column flex layout). Scroll behavior is handled by `.logs-panel-entries` with `overflow-y: auto`.
 
+### Emulated Mode UI (Feature 007)
+
+The dashboard displays emulated mode status and configuration when the backend is running in fast-cadence emulated mode:
+
+**Mode Indicator**: Orange "Emulated Mode" badge with beaker icon appears in HealthPanel header when `generation_mode: "emulated"`. Production mode shows gray badge or is hidden (backward compatible with older backends).
+
+**Configuration Details**: Expandable accordion displays 4 emulated config parameters (company interval, driver interval, companies/batch, events/batch range). Collapsed by default, expandable on-demand for troubleshooting.
+
+**Batch Cadence Metrics**: Shows batches per minute for both generators after 60 seconds uptime. Demonstrates fast cadence in emulated mode (~6 batches/min) vs production (~0.01-4 batches/min).
+
+**WCAG AA Compliance**: Mode indicator uses color + icon + text for accessibility (4.5:1 contrast via Fluent UI tokens).
+
+**Backward Compatibility**: Gracefully handles missing `generation_mode` or `emulated_config` fields from older backends (defaults to production mode, no errors).
+
+Components: `ModeIndicator.tsx`, `EmulatedConfig.tsx`, `BatchCadence.tsx` (see `specs/007-ui-emulated-display/` for full specification).
+
 ## Styling & Theming (Tokens)
 
 Design tokens live in `src/styles/tokens.ts` (spacing, typography, elevation, radii). Theme palettes (light/dark) in `src/styles/theme.ts` with severity role colors. Common usage pattern:

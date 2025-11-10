@@ -5,3 +5,18 @@ drivers_per_company: 5
 event_rate_per_driver: 3.5  # average events per 15-minute interval
 company_onboarding_interval: PT1H  # ISO8601 duration (1 hour)
 # Notes: geography fixed to US; no deactivation.
+
+# Data quality injection for testing dirty data scenarios
+quality_injection:
+  enabled: true
+  error_rate: 0.15  # 15% of records will have at least one issue
+  missing_field_probability: 0.30
+  null_value_probability: 0.25
+  malformed_timestamp_probability: 0.20
+  invalid_enum_probability: 0.15
+  duplicate_probability: 0.10
+  extra_field_probability: 0.20
+  boundary_violation_probability: 0.05
+  inject_in_driver_events: true
+  inject_in_companies: true
+  log_injected_issues: true

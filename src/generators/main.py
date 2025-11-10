@@ -127,8 +127,8 @@ def run_company_generator_continuous(
                 "Initial startup detected - generating first company batch",
                 metadata={"output_path": output_path, "count": config.active_company_count}
             )
-        companies = generator.generate_companies(config.active_company_count, seed + batch_counter, config)
-        written_count = generator.write_companies_jsonl(companies, output_path)
+        companies, corrupted_companies = generator.generate_companies(config.active_company_count, seed + batch_counter, config)
+        written_count = generator.write_companies_jsonl(companies, corrupted_companies, output_path)
         batch_counter += 1
         state.save(lifecycle, {"last_company_batch": batch_counter, "last_company_time": datetime.now(timezone.utc).isoformat()})
         if logger:
@@ -246,6 +246,10 @@ def run_driver_generator_continuous(
     has_existing_batches = output_path.exists() and any(output_path.iterdir())
     
     if not has_existing_batches:
+        # Wait for company generator to create initial batch (avoid race condition)
+        import time
+        time.sleep(2)
+        
         if logger:
             logger.info(
                 "Initial startup detected - generating first driver event batch immediately",
@@ -294,7 +298,7 @@ def run_driver_generator_continuous(
                 effective_config.event_rate_per_driver = max(0.1, adjusted_rate)
         
         # Generate events using the eligible companies
-        events = generator.generate_driver_events(
+        events, corrupted_events = generator.generate_driver_events(
             eligible_companies,
             effective_config,
             interval_start,
@@ -318,7 +322,7 @@ def run_driver_generator_continuous(
         )
         
         # Write batch
-        generator.write_batch(events, batch_meta, output_dir)
+        generator.write_batch(events, corrupted_events, batch_meta, output_dir)
         
         # Update manifest
         manifest_path = "data/manifests/batch_manifest.json"

@@ -254,6 +254,7 @@ class HealthServer:
         
         # Ensure directories exist
         (data_dir / "raw").mkdir(parents=True, exist_ok=True)
+        (data_dir / "raw" / "events").mkdir(parents=True, exist_ok=True)
         (data_dir / "manifests").mkdir(parents=True, exist_ok=True)
         (data_dir / "staged").mkdir(parents=True, exist_ok=True)
         (data_dir / "processed").mkdir(parents=True, exist_ok=True)

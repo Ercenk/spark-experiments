@@ -61,6 +61,13 @@ class QualityInjectionConfig(BaseModel):
         description="Probability of creating intentional duplicates"
     )
     
+    extra_field_probability: float = Field(
+        default=0.10,
+        ge=0.0,
+        le=1.0,
+        description="Probability of adding unexpected extra fields"
+    )
+    
     boundary_violation_probability: float = Field(
         default=0.05,
         ge=0.0,

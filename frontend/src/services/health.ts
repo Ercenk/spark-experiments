@@ -40,6 +40,11 @@ function adaptBlueprintSnapshot(raw: any): HealthResponse {
     actions: [],
     missing_files: [],
   };
+  
+  // Feature 007: Pass through emulated mode fields from backend
+  const generation_mode = (raw as any).generation_mode;
+  const emulated_config = (raw as any).emulated_config;
+  
   return HealthResponseSchema.parse({
     status: snap.status,
     timestamp: snap.timestamp,
@@ -49,6 +54,8 @@ function adaptBlueprintSnapshot(raw: any): HealthResponse {
     lifecycle,
     state,
     auto_reinit,
+    generation_mode,
+    emulated_config,
   });
 }
 

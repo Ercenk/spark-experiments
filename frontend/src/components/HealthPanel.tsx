@@ -4,6 +4,10 @@ import { useInterval } from '../hooks/useInterval';
 import { Spinner, Button, Card, CardHeader, Badge } from '@fluentui/react-components';
 import { pause, resume, reset } from '../services/control';
 import { useToast } from './ToastProvider';
+import { ModeIndicator } from './ModeIndicator';
+import { EmulatedConfig } from './EmulatedConfig';
+import { BatchCadence } from './BatchCadence';
+import type { GenerationMode, EmulatedConfig as EmulatedConfigType } from '../services/schemas';
 
 interface HealthData {
   status: string;
@@ -12,6 +16,9 @@ interface HealthData {
   company_generator: { total_batches: number; last_batch_time?: string; idle_seconds?: number | null };
   driver_generator: { total_batches: number; last_batch_time?: string; last_interval_end?: string; idle_seconds?: number | null };
   lifecycle: { paused: boolean; shutdown_requested: boolean };
+  // Feature 007: Emulated mode fields
+  generation_mode?: GenerationMode;
+  emulated_config?: EmulatedConfigType;
 }
 
 export const HealthPanel: React.FC = () => {
@@ -125,7 +132,13 @@ export const HealthPanel: React.FC = () => {
       <CardHeader
         header={<span>Health & Status</span>}
         description={<span>Updates every 5s</span>}
+        action={data.generation_mode ? <ModeIndicator mode={data.generation_mode} /> : undefined}
       />
+      {data.generation_mode === 'emulated' && data.emulated_config && (
+        <div style={{ marginBottom: '1rem' }}>
+          <EmulatedConfig config={data.emulated_config} />
+        </div>
+      )}
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <strong>Overall Status: </strong>
@@ -137,6 +150,14 @@ export const HealthPanel: React.FC = () => {
         <div><strong>Last Driver Batch:</strong> {data.driver_generator.total_batches} ({data.driver_generator.last_batch_time || 'n/a'})</div>
         <div><strong>Driver Idle (s):</strong> {data.driver_generator.idle_seconds ?? 'n/a'}</div>
       </div>
+      <BatchCadence 
+        healthData={{
+          uptime: data.uptime,
+          company_generator: data.company_generator,
+          driver_generator: data.driver_generator
+        }}
+        mode={data.generation_mode}
+      />
       <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
         {data.lifecycle.paused ? (
           <Button appearance="primary" onClick={doResume}>Resume</Button>

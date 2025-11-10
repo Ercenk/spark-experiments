@@ -19,6 +19,23 @@ export const LifecycleSchema = z.object({
   shutdown_requested: z.boolean(),
 });
 
+// Feature 007: Emulated mode support
+export const GenerationModeSchema = z.enum(['production', 'emulated'])
+  .default('production');
+
+export const EmulatedConfigSchema = z.object({
+  company_interval_seconds: z.number().positive(),
+  driver_interval_seconds: z.number().positive(),
+  companies_per_batch: z.number().positive().int(),
+  events_per_batch_range: z.tuple([
+    z.number().positive().int(),
+    z.number().positive().int()
+  ]).refine(
+    ([min, max]) => min <= max,
+    { message: "events_per_batch_range min must be <= max" }
+  )
+}).optional().nullable();
+
 export const StateSchema = z.object({
   last_saved: z.string().nullable().optional(),
   state_file: z.string(),
@@ -40,6 +57,9 @@ export const HealthResponseSchema = z.object({
   lifecycle: LifecycleSchema,
   state: StateSchema,
   auto_reinit: AutoReinitSchema,
+  // Feature 007: Emulated mode fields
+  generation_mode: GenerationModeSchema,
+  emulated_config: EmulatedConfigSchema,
 });
 
 // Blueprint snapshot raw shape (from /api/health) prior to adaptation
@@ -116,3 +136,7 @@ export type ResetResult = z.infer<typeof ResetResultSchema>;
 export type LogEntry = z.infer<typeof LogEntrySchema>;
 export type LogsResponse = z.infer<typeof LogsResponseSchema>;
 export type BlueprintHealthSnapshot = z.infer<typeof BlueprintHealthSnapshotSchema>;
+
+// Feature 007: Emulated mode types
+export type GenerationMode = z.infer<typeof GenerationModeSchema>;
+export type EmulatedConfig = z.infer<typeof EmulatedConfigSchema>;

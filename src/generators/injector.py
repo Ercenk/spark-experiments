@@ -6,7 +6,7 @@ Supports configurable injection of missing fields, nulls, malformed values, dupl
 
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 from .quality_injection import QualityInjectionConfig, InjectedIssue
 
@@ -73,6 +73,12 @@ class QualityInjector:
         if self.rng.random() < self.config.invalid_enum_probability:
             corrupted = self._inject_invalid_enum(corrupted, record_id, "event_type")
         
+        if self.rng.random() < self.config.extra_field_probability:
+            corrupted = self._inject_extra_field(corrupted, record_id)
+        
+        if self.rng.random() < self.config.boundary_violation_probability:
+            corrupted = self._inject_boundary_violation(corrupted, record_id, "timestamp")
+        
         return corrupted
     
     def inject_into_company(self, company: Dict[str, Any]) -> Dict[str, Any]:
@@ -105,6 +111,9 @@ class QualityInjector:
         
         if self.rng.random() < self.config.malformed_timestamp_probability:
             corrupted = self._inject_malformed_timestamp(corrupted, record_id, "created_at")
+        
+        if self.rng.random() < self.config.extra_field_probability:
+            corrupted = self._inject_extra_field(corrupted, record_id)
         
         return corrupted
     
@@ -212,6 +221,63 @@ class QualityInjector:
             original_value=str(original_value),
             injected_value=record[field_name],
             reason_code="ENUM_INVALID"
+        )
+        
+        return record
+    
+    def _inject_extra_field(self, record: Dict[str, Any], record_id: str) -> Dict[str, Any]:
+        """Add unexpected extra fields to the record."""
+        extra_fields = [
+            ("legacy_id", "LEGACY_" + str(self.rng.randint(10000, 99999))),
+            ("debug_flag", True),
+            ("internal_notes", "System migration artifact"),
+            ("_metadata", {"source": "legacy_system", "version": "1.0"}),
+            ("temp_field", None),
+            ("extra_timestamp", datetime.now().isoformat()),
+        ]
+        
+        # Choose random field by index
+        idx = self.rng.randint(0, len(extra_fields))
+        field_name, field_value = extra_fields[idx]
+        record[field_name] = field_value
+        
+        self._log_issue(
+            record_id=record_id,
+            issue_type="extra_field",
+            affected_field=field_name,
+            original_value=None,
+            injected_value=str(field_value),
+            reason_code="EXTRA_FIELD_ADDED"
+        )
+        
+        return record
+    
+    def _inject_boundary_violation(self, record: Dict[str, Any], record_id: str,
+                                   field_name: str) -> Dict[str, Any]:
+        """Inject timestamp that's outside the valid interval bounds."""
+        if field_name not in record:
+            return record
+        
+        original_value = record[field_name]
+        
+        # Create timestamps that are outside reasonable bounds
+        violations = [
+            "2024-01-01T00:00:00Z",  # Way in the past
+            "2030-01-01T00:00:00Z",  # Way in the future
+            (datetime.now() - timedelta(days=365)).isoformat() + "Z",  # 1 year ago
+        ]
+        
+        # Choose random violation by index
+        idx = self.rng.randint(0, len(violations))
+        record[field_name] = violations[idx]
+        
+        self._log_issue(
+            record_id=record_id,
+            issue_type="boundary_violation",
+            affected_field=field_name,
+            original_value=str(original_value),
+            injected_value=record[field_name],
+            reason_code="TIMESTAMP_OUT_OF_BOUNDS"
         )
         
         return record

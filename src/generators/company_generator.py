@@ -69,7 +69,7 @@ class CompanyGenerator(BaseGenerator):
                 # Invalid company - write as corrupted dict
                 corrupted_companies.append(corrupted_dict)
                 if self.logger:
-                    self.logger.debug(f"Quality injection created invalid company: {corrupted_dict}")
+                    self.logger.info(f"Quality injection created invalid company: {corrupted_dict}")
         
         # Log quality injection summary
         if injector.config.enabled and self.logger:

@@ -56,7 +56,18 @@ frontend/.env.*
 # Data (local volumes, not tracked)
 data/*
 !data/.gitkeep
+!data/manifests/
+data/manifests/*
 !data/manifests/.gitkeep
+!data/raw/
+data/raw/*
+!data/raw/.gitkeep
+!data/processed/
+data/processed/*
+!data/processed/.gitkeep
+!data/staged/
+data/staged/*
+!data/staged/.gitkeep
 
 # Demo outputs (generated data)
 demo_output/

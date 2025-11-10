@@ -97,7 +97,12 @@ class BaselineInitializer:
                 driver_cfg = drv.load_config(str(self.config_path))
                 seed = drv.get_seed("data/manifests/seed_manifest.json", seed_value)
                 now = datetime.now(timezone.utc)
-                interval_start, interval_end = drv.compute_interval_bounds(now, 15)
+                # For baseline initialization, use the current time as interval_start
+                # so that newly created companies (created_at <= now) are eligible.
+                # This ensures the batch includes all baseline companies.
+                interval_duration_minutes = 15
+                interval_start = now
+                interval_end = now + timedelta(minutes=interval_duration_minutes)
                 drv.generate_single_batch(
                     driver_cfg,
                     str(self.events_dir),

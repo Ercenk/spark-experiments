@@ -1,8 +1,0 @@
-{
-  "batch_id": "20240101T120000Z",
-  "interval_start": "2024-01-01T12:00:00Z",
-  "interval_end": "2024-01-01T12:15:00Z",
-  "event_count": 91,
-  "seed": 42,
-  "generation_time": "2025-11-10T04:21:06.371483"
-}
